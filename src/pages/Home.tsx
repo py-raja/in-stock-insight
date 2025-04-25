@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AreaChart,
   ResponsiveContainer,
@@ -13,7 +14,9 @@ import {
 import { LineChart, Line, Legend, BarChart, Bar } from 'recharts';
 import MetricCard from '@/components/common/MetricCard';
 import DataTable from '@/components/common/DataTable';
-import TabsContent from '@/components/common/TabsContent';
+import TabsContainer from '@/components/common/TabsContent';
+import { ShoppingBag, ArrowUpCircle, Users, TrendingUp } from 'lucide-react';
+import PageHeader from '@/components/common/PageHeader';
 import {
   getTopProfitCustomers,
   getTopDebtCustomers,

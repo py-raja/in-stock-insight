@@ -154,7 +154,6 @@ const AddNewPurchase = () => {
       })
     });
     
-    // Get products for this company
     const products = getProductsByCompany(value);
     setAvailableProducts(products);
   };
@@ -171,7 +170,7 @@ const AddNewPurchase = () => {
   const handleProductChange = (index: number, field: keyof PurchaseProduct, value: any) => {
     const updatedProducts = [...purchaseForm.products];
     
-    if (field === "productName") {
+    if (field === "productId") {
       const selectedProduct = availableProducts.find(p => p.productId === parseInt(value));
       if (selectedProduct) {
         updatedProducts[index] = {
@@ -217,7 +216,6 @@ const AddNewPurchase = () => {
   };
 
   const handleSubmit = () => {
-    // Filter out empty products
     const validProducts = purchaseForm.products.filter(
       p => p.productId !== 0 && p.purchasePrice > 0 && p.quantity > 0
     );
@@ -240,13 +238,11 @@ const AddNewPurchase = () => {
       return;
     }
     
-    // Here you would normally send data to your backend
     toast({
       title: "Purchase Added",
       description: `Purchase ID: ${purchaseForm.purchaseId} has been added successfully`,
     });
     
-    // Reset form
     setPurchaseForm({
       purchaseId: getNextPurchaseId(),
       companyName: '',
@@ -428,7 +424,6 @@ const ModifyPurchase = () => {
         products: purchase.products
       });
       
-      // Get products for this company
       const products = getProductsByCompany(purchase.companyName);
       setAvailableProducts(products);
     } else {
@@ -446,7 +441,7 @@ const ModifyPurchase = () => {
     
     const updatedProducts = [...purchaseForm.products];
     
-    if (field === "productName") {
+    if (field === "productId") {
       const selectedProduct = availableProducts.find(p => p.productId === parseInt(value));
       if (selectedProduct) {
         updatedProducts[index] = {
@@ -496,7 +491,6 @@ const ModifyPurchase = () => {
   const handleSubmit = () => {
     if (!purchaseForm) return;
     
-    // Filter out empty products
     const validProducts = purchaseForm.products.filter(
       p => p.productId !== 0 && p.purchasePrice > 0 && p.quantity > 0
     );
@@ -510,13 +504,11 @@ const ModifyPurchase = () => {
       return;
     }
     
-    // Here you would normally update data in your backend
     toast({
       title: "Purchase Updated",
       description: `Purchase ID: ${purchaseForm.purchaseId} has been updated successfully`,
     });
     
-    // Reset form
     setPurchaseForm(null);
     setSearchId('');
   };
