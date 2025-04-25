@@ -171,7 +171,7 @@ const AddNewPurchase = () => {
   const handleProductChange = (index: number, field: keyof PurchaseProduct, value: any) => {
     const updatedProducts = [...purchaseForm.products];
     
-    if (field === 'productId') {
+    if (field === "productName") {
       const selectedProduct = availableProducts.find(p => p.productId === parseInt(value));
       if (selectedProduct) {
         updatedProducts[index] = {
@@ -446,7 +446,7 @@ const ModifyPurchase = () => {
     
     const updatedProducts = [...purchaseForm.products];
     
-    if (field === 'productId') {
+    if (field === "productName") {
       const selectedProduct = availableProducts.find(p => p.productId === parseInt(value));
       if (selectedProduct) {
         updatedProducts[index] = {

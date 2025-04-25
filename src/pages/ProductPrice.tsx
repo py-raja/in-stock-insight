@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,12 @@ const ProductPriceTable = () => {
   const [editMode, setEditMode] = useState(false);
   const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
   const [products, setProducts] = useState(productPrices);
+  const [currentCustomers, setCurrentCustomers] = useState(customers);
+  
+  // Fetch the latest customer data whenever the component is rendered
+  useEffect(() => {
+    setCurrentCustomers([...customers]);
+  }, []);
   
   const handleEditChange = (productId: number, customerId: number, value: string) => {
     const priceKey = `${productId}-${customerId}`;
@@ -46,7 +52,7 @@ const ProductPriceTable = () => {
       const updatedPrices = { ...product.prices };
       
       // For each customer, check if there's an edited price for this product
-      customers.forEach(customer => {
+      currentCustomers.forEach(customer => {
         const priceKey = `${product.productId}-${customer.customerId}`;
         if (priceKey in editedPrices) {
           updatedPrices[customer.customerId] = editedPrices[priceKey];
@@ -104,7 +110,7 @@ const ProductPriceTable = () => {
     
     // Create prices for all customers
     const newPrices: Record<number, number> = {};
-    customers.forEach(customer => {
+    currentCustomers.forEach(customer => {
       newPrices[customer.customerId] = newProduct.defaultPrice;
     });
     
@@ -207,7 +213,7 @@ const ProductPriceTable = () => {
                   >
                     Products / Customers
                   </th>
-                  {customers.map(customer => (
+                  {currentCustomers.map(customer => (
                     <th 
                       key={customer.customerId}
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r"
@@ -224,27 +230,35 @@ const ProductPriceTable = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
                       {product.productName}
                     </td>
-                    {customers.map(customer => (
-                      <td 
-                        key={customer.customerId} 
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 border-r"
-                      >
-                        {editMode ? (
-                          <Input
-                            type="number"
-                            value={getDisplayPrice(product.productId, customer.customerId)}
-                            onChange={(e) => handleEditChange(
-                              product.productId, 
-                              customer.customerId, 
-                              e.target.value
-                            )}
-                            className="w-24"
-                          />
-                        ) : (
-                          `₹${getDisplayPrice(product.productId, customer.customerId).toLocaleString()}`
-                        )}
-                      </td>
-                    ))}
+                    {currentCustomers.map(customer => {
+                      // Check if this customer exists in this product's prices
+                      // If not (it's a new customer), initialize with default price
+                      if (!product.prices[customer.customerId]) {
+                        product.prices[customer.customerId] = product.prices[Object.keys(product.prices)[0]] || 0;
+                      }
+                      
+                      return (
+                        <td 
+                          key={customer.customerId} 
+                          className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 border-r"
+                        >
+                          {editMode ? (
+                            <Input
+                              type="number"
+                              value={getDisplayPrice(product.productId, customer.customerId)}
+                              onChange={(e) => handleEditChange(
+                                product.productId, 
+                                customer.customerId, 
+                                e.target.value
+                              )}
+                              className="w-24"
+                            />
+                          ) : (
+                            `₹${getDisplayPrice(product.productId, customer.customerId).toLocaleString()}`
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
