@@ -62,7 +62,7 @@ const Sales = () => {
     totalAmount: 0
   });
   
-  const [recentSales, setRecentSales] = useState([...sales]);
+  const [recentSales, setRecentSales] = useState<SalesTransaction[]>([...sales]);
   
   const filteredSales = recentSales.filter(sale =>
     sale.salesId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -305,9 +305,9 @@ const Sales = () => {
   };
 
   const salesColumns = [
-    { header: 'Sales ID', accessorKey: 'salesId' },
-    { header: 'Date', accessorKey: 'date' },
-    { header: 'Customer', accessorKey: 'customerName' },
+    { header: 'Sales ID', accessorKey: 'salesId' as keyof SalesTransaction },
+    { header: 'Date', accessorKey: 'date' as keyof SalesTransaction },
+    { header: 'Customer', accessorKey: 'customerName' as keyof SalesTransaction },
     { 
       header: 'Products', 
       accessorKey: (row: SalesTransaction) => `${row.products.length} items` 

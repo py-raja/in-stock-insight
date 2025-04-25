@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { Search, Plus, Save, Trash, Edit, Calendar } from 'lucide-react';
@@ -55,16 +54,16 @@ const PurchaseDetails = () => {
   });
 
   const columns = [
-    { header: 'Purchase ID', accessorKey: 'purchaseId' },
-    { header: 'Company Name', accessorKey: 'companyName' },
-    { header: 'Purchase Date', accessorKey: 'purchaseDate' },
+    { header: 'Purchase ID', accessorKey: 'purchaseId' as keyof typeof purchases[0] },
+    { header: 'Company Name', accessorKey: 'companyName' as keyof typeof purchases[0] },
+    { header: 'Purchase Date', accessorKey: 'purchaseDate' as keyof typeof purchases[0] },
     { 
       header: 'Products', 
-      accessorKey: (row) => `${row.products.length} items` 
+      accessorKey: (row: typeof purchases[0]) => `${row.products.length} items` 
     },
     { 
       header: 'Total Amount', 
-      accessorKey: (row) => {
+      accessorKey: (row: typeof purchases[0]) => {
         const total = row.products.reduce(
           (sum, product) => sum + (product.purchasePrice * product.quantity), 
           0
@@ -74,7 +73,7 @@ const PurchaseDetails = () => {
     },
     {
       header: 'Actions',
-      accessorKey: (row) => (
+      accessorKey: (row: typeof purchases[0]) => (
         <div className="flex space-x-2">
           <Button variant="outline" size="sm">
             <Edit className="h-4 w-4 mr-1" /> View
@@ -186,7 +185,9 @@ const AddNewPurchase = () => {
     } else {
       updatedProducts[index] = {
         ...updatedProducts[index],
-        [field]: field === 'productId' ? parseInt(value) : parseFloat(value)
+        [field]: typeof value === 'string' ? 
+          (field === 'productName' ? value : parseFloat(value)) : 
+          value
       };
     }
     
@@ -393,25 +394,15 @@ const AddNewPurchase = () => {
                 </tbody>
               </table>
             </div>
-
+            
             <div className="mt-4 flex justify-between">
               <Button variant="outline" onClick={addRow}>
                 <Plus className="h-4 w-4 mr-2" /> Add Row
               </Button>
               
-              <div className="text-right">
-                <div className="text-gray-500 text-sm mb-1">
-                  Total Amount: <span className="font-bold">₹
-                    {purchaseForm.products.reduce(
-                      (sum, p) => sum + (p.purchasePrice * p.quantity), 
-                      0
-                    ).toLocaleString()}
-                  </span>
-                </div>
-                <Button onClick={handleSubmit}>
-                  <Save className="h-4 w-4 mr-2" /> Save Purchase
-                </Button>
-              </div>
+              <Button onClick={handleSubmit}>
+                <Save className="h-4 w-4 mr-2" /> Save Purchase
+              </Button>
             </div>
           </div>
         </div>

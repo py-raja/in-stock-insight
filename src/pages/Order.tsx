@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash, Save, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -281,7 +280,7 @@ const OrderCalendar = () => {
   const orderedDates = Object.keys(calendarOrders);
   
   // Create a function to render day contents in the calendar
-  const renderDayContents = (day: Date) => {
+  const renderDayContent = (day: Date) => {
     const dateString = format(day, 'yyyy-MM-dd');
     const dayOrders = calendarOrders[dateString] || [];
     
@@ -339,13 +338,12 @@ const OrderCalendar = () => {
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
-                renderDay={(day) => renderDayContents(day)}
-                className="rounded-md border w-full"
-                styles={{
-                  day: {
-                    width: '100%',
-                    height: '40px'
-                  }
+                className="rounded-md border w-full pointer-events-auto"
+                modifiersStyles={{
+                  selected: { fontWeight: "bold" }
+                }}
+                components={{
+                  DayContent: ({ date, activeModifiers }) => renderDayContent(date)
                 }}
               />
             </div>

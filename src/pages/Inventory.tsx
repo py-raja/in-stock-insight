@@ -76,53 +76,49 @@ const Inventory = () => {
   const columns = [
     { 
       header: 'Product ID', 
-      accessorKey: 'productId'
+      accessorKey: 'productId' as keyof Product
     },
     { 
       header: 'Company Name', 
-      accessorKey: 'companyName' 
+      accessorKey: 'companyName' as keyof Product
     },
     { 
       header: 'Product Name', 
-      accessorKey: 'productName' 
+      accessorKey: 'productName' as keyof Product 
     },
     { 
       header: 'Available Qty', 
-      accessorKey: editMode 
-        ? (row: Product) => {
-            // If this row is being edited, show an input
-            if (editedRow && editedRow.productId === row.productId) {
-              return (
-                <Input
-                  type="number"
-                  value={editedRow.availableQuantity}
-                  onChange={(e) => handleInputChange('availableQuantity', e.target.value)}
-                  className="w-20"
-                />
-              );
-            }
-            // Otherwise show the value
-            return row.availableQuantity;
-          }
-        : 'availableQuantity'
+      accessorKey: (row: Product) => {
+        // If this row is being edited, show an input
+        if (editMode && editedRow && editedRow.productId === row.productId) {
+          return (
+            <Input
+              type="number"
+              value={editedRow.availableQuantity}
+              onChange={(e) => handleInputChange('availableQuantity', e.target.value)}
+              className="w-20"
+            />
+          );
+        }
+        // Otherwise show the value
+        return row.availableQuantity;
+      }
     },
     { 
       header: 'Ordered Qty', 
-      accessorKey: editMode 
-        ? (row: Product) => {
-            if (editedRow && editedRow.productId === row.productId) {
-              return (
-                <Input
-                  type="number"
-                  value={editedRow.orderedQuantity}
-                  onChange={(e) => handleInputChange('orderedQuantity', e.target.value)}
-                  className="w-20"
-                />
-              );
-            }
-            return row.orderedQuantity;
-          }
-        : 'orderedQuantity'
+      accessorKey: (row: Product) => {
+        if (editMode && editedRow && editedRow.productId === row.productId) {
+          return (
+            <Input
+              type="number"
+              value={editedRow.orderedQuantity}
+              onChange={(e) => handleInputChange('orderedQuantity', e.target.value)}
+              className="w-20"
+            />
+          );
+        }
+        return row.orderedQuantity;
+      }
     },
     { 
       header: 'Actual Qty', 

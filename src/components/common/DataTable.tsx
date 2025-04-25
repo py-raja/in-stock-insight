@@ -12,7 +12,6 @@ import {
 interface Column<T> {
   header: string;
   accessorKey: keyof T | ((row: T) => React.ReactNode);
-  cell?: (row: T) => React.ReactNode;
 }
 
 interface DataTableProps<T> {
@@ -61,11 +60,9 @@ function DataTable<T>({
             <TableRow key={rowIndex}>
               {columns.map((column, colIndex) => (
                 <TableCell key={colIndex}>
-                  {column.cell 
-                    ? column.cell(row)
-                    : typeof column.accessorKey === 'function'
-                      ? column.accessorKey(row)
-                      : String(row[column.accessorKey] || '')}
+                  {typeof column.accessorKey === 'function'
+                    ? column.accessorKey(row)
+                    : String(row[column.accessorKey] ?? '')}
                 </TableCell>
               ))}
             </TableRow>

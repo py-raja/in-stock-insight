@@ -29,14 +29,16 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
-import { customers, Customer, getNextCustomerId } from '@/services/mockData';
+import { customers, getNextCustomerId } from '@/services/mockData';
+// Import Customer as a type-only import to avoid conflicts
+import type { Customer as CustomerType } from '@/services/mockData';
 
 const Customer = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [customerData, setCustomerData] = useState([...customers]);
+  const [customerData, setCustomerData] = useState<CustomerType[]>([...customers]);
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
-  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  const [editCustomer, setEditCustomer] = useState<CustomerType | null>(null);
   
   // New customer state
   const [newCustomer, setNewCustomer] = useState({
@@ -75,7 +77,7 @@ const Customer = () => {
     });
   };
   
-  const handleEditInputChange = (field: keyof Customer, value: string | number) => {
+  const handleEditInputChange = (field: keyof CustomerType, value: string | number) => {
     if (editCustomer) {
       setEditCustomer({
         ...editCustomer,
@@ -96,7 +98,7 @@ const Customer = () => {
     }
     
     // Create new customer with next available ID
-    const customerToAdd: Customer = {
+    const customerToAdd: CustomerType = {
       customerId: getNextCustomerId(),
       ...newCustomer,
       amountBalance: 0,
@@ -155,57 +157,66 @@ const Customer = () => {
   const columns = [
     { 
       header: '',
-      accessorKey: (row: Customer) => (
+      accessorKey: (row: CustomerType) => (
         <Checkbox
           checked={selectedCustomers.includes(row.customerId)}
           onCheckedChange={(checked) => handleSelectCustomer(row.customerId, !!checked)}
         />
       )
     },
-    { header: 'ID', accessorKey: 'customerId' },
+    { header: 'ID', accessorKey: 'customerId' as keyof CustomerType },
     { 
       header: 'Customer Name', 
-      accessorKey: editCustomer && editCustomer.customerId === ((customer: Customer) => customer.customerId)
-        ? (customer: Customer) => (
+      accessorKey: (customer: CustomerType) => {
+        if (editCustomer && editCustomer.customerId === customer.customerId) {
+          return (
             <Input
               value={editCustomer.customerName}
               onChange={(e) => handleEditInputChange('customerName', e.target.value)}
               className="min-w-[200px]"
             />
-          )
-        : 'customerName'
+          );
+        }
+        return customer.customerName;
+      }
     },
     { 
       header: 'Address', 
-      accessorKey: editCustomer && editCustomer.customerId === ((customer: Customer) => customer.customerId)
-        ? (customer: Customer) => (
+      accessorKey: (customer: CustomerType) => {
+        if (editCustomer && editCustomer.customerId === customer.customerId) {
+          return (
             <Input
               value={editCustomer.customerAddress}
               onChange={(e) => handleEditInputChange('customerAddress', e.target.value)}
               className="min-w-[200px]"
             />
-          )
-        : 'customerAddress'
+          );
+        }
+        return customer.customerAddress;
+      }
     },
     { 
       header: 'Mobile', 
-      accessorKey: editCustomer && editCustomer.customerId === ((customer: Customer) => customer.customerId)
-        ? (customer: Customer) => (
+      accessorKey: (customer: CustomerType) => {
+        if (editCustomer && editCustomer.customerId === customer.customerId) {
+          return (
             <Input
               value={editCustomer.customerMobile}
               onChange={(e) => handleEditInputChange('customerMobile', e.target.value)}
               className="min-w-[120px]"
             />
-          )
-        : 'customerMobile'
+          );
+        }
+        return customer.customerMobile;
+      }
     },
     { 
       header: 'Balance', 
-      accessorKey: (customer: Customer) => `₹${customer.amountBalance.toLocaleString()}`
+      accessorKey: (customer: CustomerType) => `₹${customer.amountBalance.toLocaleString()}`
     },
     {
       header: 'Actions',
-      accessorKey: (customer: Customer) => {
+      accessorKey: (customer: CustomerType) => {
         if (editCustomer && editCustomer.customerId === customer.customerId) {
           return (
             <div className="flex space-x-2">
