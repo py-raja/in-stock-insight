@@ -501,6 +501,10 @@ export const getProductById = (productId: number): Product | undefined => {
   return products.find(product => product.productId === productId);
 };
 
+export const getSaleById = (salesId: string): SalesTransaction | undefined => {
+  return sales.find(sale => sale.salesId === salesId);
+};
+
 export const getProductsByCompany = (companyName: string): Product[] => {
   return products.filter(product => product.companyName === companyName);
 };
