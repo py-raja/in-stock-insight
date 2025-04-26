@@ -1,4 +1,3 @@
-
 // Mock data to simulate database
 
 // Types
@@ -50,7 +49,7 @@ export interface SalesTransaction {
   totalAmount: number;
 }
 
-export interface Order {
+export type Order = {
   orderId: string;
   orderDate: string;
   customerId: number;
@@ -63,7 +62,9 @@ export interface Order {
   }[];
   remarks: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
-}
+  advanceAmount?: number;
+  salesId?: string;
+};
 
 export interface ProductPrice {
   productId: number;
@@ -396,58 +397,41 @@ export const sales: SalesTransaction[] = [
 
 export const orders: Order[] = [
   {
-    orderId: 'O202404001',
-    orderDate: '2024-04-25',
+    orderId: 'O20250400001',
+    orderDate: '2025-04-26',
     customerId: 1,
-    customerName: 'ABC Electronics',
+    customerName: 'ABC Enterprises',
     products: [
-      {
-        productId: 1,
-        productName: 'Laptop',
-        salesPrice: 24500,
-        quantity: 2
-      }
+      { productId: 1, productName: 'Product A', salesPrice: 250, quantity: 5 },
+      { productId: 2, productName: 'Product B', salesPrice: 180, quantity: 3 }
     ],
-    remarks: 'Urgent delivery',
+    remarks: 'Urgent order, needed by end of week',
+    status: 'pending',
+    advanceAmount: 500
+  },
+  {
+    orderId: 'O20250400002',
+    orderDate: '2025-04-27',
+    customerId: 2,
+    customerName: 'XYZ Corporation',
+    products: [
+      { productId: 3, productName: 'Product C', salesPrice: 320, quantity: 2 },
+      { productId: 4, productName: 'Product D', salesPrice: 450, quantity: 1 }
+    ],
+    remarks: '',
     status: 'processing'
   },
   {
-    orderId: 'O202404002',
-    orderDate: '2024-04-26',
-    customerId: 2,
-    customerName: 'XYZ Retail',
-    products: [
-      {
-        productId: 3,
-        productName: 'Printer',
-        salesPrice: 12000,
-        quantity: 3
-      },
-      {
-        productId: 4,
-        productName: 'Scanner',
-        salesPrice: 5000,
-        quantity: 3
-      }
-    ],
-    remarks: 'Call before delivery',
-    status: 'pending'
-  },
-  {
-    orderId: 'O202404003',
-    orderDate: '2024-04-30',
+    orderId: 'O20250400003',
+    orderDate: '2025-04-28',
     customerId: 3,
-    customerName: 'PQR Distributors',
+    customerName: 'Smith Industries',
     products: [
-      {
-        productId: 5,
-        productName: 'Smartphone',
-        salesPrice: 15000,
-        quantity: 5
-      }
+      { productId: 2, productName: 'Product B', salesPrice: 180, quantity: 10 }
     ],
-    remarks: 'With free screen protector',
-    status: 'pending'
+    remarks: 'Corporate bulk order',
+    status: 'completed',
+    salesId: 'S20250400001'
   }
 ];
 
@@ -472,14 +456,37 @@ export const getNextSalesId = (): string => {
   return `S${year}${month}${(lastSalesId + 1).toString().padStart(3, '0')}`;
 };
 
-export const getNextOrderId = (): string => {
+export const getNextOrderId = (prefix: string = 'O') => {
   const date = new Date();
-  const year = date.getFullYear().toString();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const lastOrderId = orders.length > 0 ? 
-    parseInt(orders[orders.length - 1].orderId.slice(-3)) : 0;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
   
-  return `O${year}${month}${(lastOrderId + 1).toString().padStart(3, '0')}`;
+  const basePrefix = prefix + year + month;
+  
+  let maxOrderNum = 0;
+  
+  if (prefix.startsWith('O')) {
+    orders.forEach(order => {
+      if (order.orderId.startsWith(basePrefix)) {
+        const orderNum = parseInt(order.orderId.slice(basePrefix.length));
+        if (orderNum > maxOrderNum) {
+          maxOrderNum = orderNum;
+        }
+      }
+    });
+  } else {
+    orders.forEach(order => {
+      if (order.salesId && order.salesId.startsWith(basePrefix)) {
+        const orderNum = parseInt(order.salesId.slice(basePrefix.length));
+        if (orderNum > maxOrderNum) {
+          maxOrderNum = orderNum;
+        }
+      }
+    });
+  }
+  
+  const nextNum = maxOrderNum + 1;
+  return `${basePrefix}${String(nextNum).padStart(5, '0')}`;
 };
 
 export const getNextCustomerId = (): number => {
@@ -531,7 +538,6 @@ export const getTopDebtCustomers = (limit: number = 5): Customer[] => {
 };
 
 export const getTopSellingProducts = (limit: number = 5): any[] => {
-  // Calculate total sales for each product
   const productSales = products.map(product => {
     const totalSales = sales.reduce((sum, sale) => {
       const productSale = sale.products.find(p => p.productId === product.productId);
@@ -543,7 +549,6 @@ export const getTopSellingProducts = (limit: number = 5): any[] => {
       return sum + (productSale ? productSale.quantity : 0);
     }, 0);
 
-    // Estimate profit (for mock data)
     const profit = totalSales * 0.2;
 
     return {
@@ -586,4 +591,40 @@ export const getSalesPurchaseData = () => {
     { name: 'Nov', sales: 7000, purchases: 4000, profit: 3000 },
     { name: 'Dec', sales: 9000, purchases: 5000, profit: 4000 },
   ];
+};
+
+// Helper function to update inventory based on orders
+export const updateInventoryFromOrder = (order: Order, action: 'order' | 'cancel' | 'complete') => {
+  order.products.forEach(orderProduct => {
+    const product = products.find(p => p.productId === orderProduct.productId);
+    
+    if (product) {
+      switch (action) {
+        case 'order':
+          product.orderedQuantity += orderProduct.quantity;
+          break;
+        
+        case 'cancel':
+          product.orderedQuantity = Math.max(0, product.orderedQuantity - orderProduct.quantity);
+          break;
+          
+        case 'complete':
+          product.orderedQuantity = Math.max(0, product.orderedQuantity - orderProduct.quantity);
+          product.availableQuantity = Math.max(0, product.availableQuantity - orderProduct.quantity);
+          break;
+      }
+      
+      product.actualQuantity = product.availableQuantity - product.orderedQuantity;
+    }
+  });
+};
+
+// Helper function to update customer balance
+export const updateCustomerBalance = (customerId: number, amount: number) => {
+  const customer = customers.find(c => c.customerId === customerId);
+  
+  if (customer) {
+    customer.amountReceived += amount;
+    customer.amountBalance = customer.totalSales - customer.amountReceived;
+  }
 };

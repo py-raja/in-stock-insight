@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash, Save, Check, X } from 'lucide-react';
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -40,7 +41,9 @@ import {
   orders,
   Order as OrderType,
   getCustomerProductPrice,
-  getNextOrderId
+  getNextOrderId,
+  updateInventoryFromOrder,
+  updateCustomerBalance
 } from '@/services/mockData';
 
 interface CalendarDayOrders {
@@ -58,7 +61,10 @@ const OrderCalendar = () => {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [modifyDialogOpen, setModifyDialogOpen] = useState(false);
+  const [advanceAmountDialogOpen, setAdvanceAmountDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderType | null>(null);
+  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [calendarOrders, setCalendarOrders] = useState<CalendarDayOrders>(() => {
     // Group orders by date
     const grouped: CalendarDayOrders = {};
@@ -75,16 +81,15 @@ const OrderCalendar = () => {
   // Form state for new order
   const [orderForm, setOrderForm] = useState({
     customerId: '',
-    products: [{ 
-      productId: 0, 
-      productName: '', 
-      salesPrice: 0, 
-      quantity: 0 
-    }],
+    products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
     remarks: '',
-    status: 'pending'
+    status: 'pending',
+    advanceAmount: 0
   });
   
+  // Form state for modifying an order
+  const [modifyForm, setModifyForm] = useState<OrderType | null>(null);
+
   const handleOrderClick = (order: OrderType) => {
     setSelectedOrder(order);
   };
@@ -92,14 +97,10 @@ const OrderCalendar = () => {
   const handleNewOrder = () => {
     setOrderForm({
       customerId: '',
-      products: [{ 
-        productId: 0, 
-        productName: '', 
-        salesPrice: 0, 
-        quantity: 0 
-      }],
+      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
       remarks: '',
-      status: 'pending'
+      status: 'pending',
+      advanceAmount: 0
     });
     setOrderDialogOpen(true);
   };
@@ -108,12 +109,7 @@ const OrderCalendar = () => {
     setOrderForm({
       ...orderForm,
       customerId,
-      products: [{ 
-        productId: 0, 
-        productName: '', 
-        salesPrice: 0, 
-        quantity: 0 
-      }],
+      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
     });
   };
   
@@ -189,6 +185,88 @@ const OrderCalendar = () => {
     });
   };
   
+  const handleModifyProductChange = (index: number, productId: string) => {
+    if (!modifyForm) return;
+    
+    const productId_num = parseInt(productId);
+    const product = products.find(p => p.productId === productId_num);
+    
+    if (product) {
+      const price = getCustomerProductPrice(modifyForm.customerId, productId_num);
+      
+      const updatedProducts = [...modifyForm.products];
+      updatedProducts[index] = {
+        productId: productId_num,
+        productName: product.productName,
+        salesPrice: price,
+        quantity: 0
+      };
+      
+      setModifyForm({
+        ...modifyForm,
+        products: updatedProducts,
+      });
+    }
+  };
+  
+  const handleModifyQuantityChange = (index: number, quantity: string) => {
+    if (!modifyForm) return;
+    
+    const qty = parseInt(quantity);
+    
+    const updatedProducts = [...modifyForm.products];
+    updatedProducts[index] = {
+      ...updatedProducts[index],
+      quantity: isNaN(qty) ? 0 : qty
+    };
+    
+    setModifyForm({
+      ...modifyForm,
+      products: updatedProducts,
+    });
+  };
+  
+  const handleModifyPriceChange = (index: number, price: string) => {
+    if (!modifyForm) return;
+    
+    const priceValue = parseFloat(price);
+    
+    const updatedProducts = [...modifyForm.products];
+    updatedProducts[index] = {
+      ...updatedProducts[index],
+      salesPrice: isNaN(priceValue) ? 0 : priceValue
+    };
+    
+    setModifyForm({
+      ...modifyForm,
+      products: updatedProducts,
+    });
+  };
+  
+  const addModifyProductRow = () => {
+    if (!modifyForm) return;
+    
+    setModifyForm({
+      ...modifyForm,
+      products: [
+        ...modifyForm.products,
+        { productId: 0, productName: '', salesPrice: 0, quantity: 0 }
+      ]
+    });
+  };
+  
+  const removeModifyProductRow = (index: number) => {
+    if (!modifyForm) return;
+    
+    const updatedProducts = [...modifyForm.products];
+    updatedProducts.splice(index, 1);
+    
+    setModifyForm({
+      ...modifyForm,
+      products: updatedProducts
+    });
+  };
+
   const handleSubmitOrder = () => {
     // Validate
     if (!orderForm.customerId) {
@@ -218,16 +296,24 @@ const OrderCalendar = () => {
     const customer = customers.find(c => c.customerId.toString() === orderForm.customerId);
     if (!customer) return;
     
+    // Generate Order ID in the format OYYYYMM00000
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `O${year}${month}`;
+    const nextId = getNextOrderId(prefix);
+    
     // Create new order
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     const newOrder: OrderType = {
-      orderId: getNextOrderId(),
+      orderId: nextId,
       orderDate: formattedDate,
       customerId: parseInt(orderForm.customerId),
       customerName: customer.customerName,
       products: validProducts,
       remarks: orderForm.remarks,
-      status: 'pending'
+      status: 'pending',
+      advanceAmount: 0
     };
     
     // Add to calendar orders
@@ -240,7 +326,22 @@ const OrderCalendar = () => {
       return updated;
     });
     
+    setOrderForm({
+      customerId: '',
+      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
+      remarks: '',
+      status: 'pending',
+      advanceAmount: 0
+    });
+    
     setOrderDialogOpen(false);
+    setSelectedOrder(newOrder);
+    
+    // Update inventory for ordered quantities
+    updateInventoryFromOrder(newOrder, 'order');
+    
+    // Show advance amount dialog
+    setAdvanceAmountDialogOpen(true);
     
     toast({
       title: "Order Created",
@@ -248,8 +349,150 @@ const OrderCalendar = () => {
     });
   };
   
+  const handleAdvanceAmountSubmit = () => {
+    if (!selectedOrder) return;
+    
+    // Update the order with advance amount
+    const updatedOrder = { ...selectedOrder, advanceAmount };
+    
+    // Update calendar orders
+    setCalendarOrders(prev => {
+      const updated = { ...prev };
+      const date = selectedOrder.orderDate;
+      
+      if (updated[date]) {
+        updated[date] = updated[date].map(order => 
+          order.orderId === selectedOrder.orderId ? updatedOrder : order
+        );
+      }
+      
+      return updated;
+    });
+    
+    setSelectedOrder(updatedOrder);
+    setAdvanceAmountDialogOpen(false);
+    setAdvanceAmount(0);
+    
+    // Update customer balance
+    if (advanceAmount > 0) {
+      updateCustomerBalance(updatedOrder.customerId, advanceAmount);
+    }
+    
+    toast({
+      title: "Advance Payment Applied",
+      description: `₹${advanceAmount.toLocaleString()} advance payment recorded for Order #${updatedOrder.orderId}`
+    });
+  };
+  
+  const handleModifyOrder = () => {
+    if (!selectedOrder) return;
+    
+    setModifyForm({ ...selectedOrder });
+    setModifyDialogOpen(true);
+  };
+  
+  const handleSaveModifiedOrder = () => {
+    if (!modifyForm || !selectedOrder) return;
+    
+    // Validate
+    const validProducts = modifyForm.products.filter(
+      p => p.productId !== 0 && p.quantity > 0
+    );
+    
+    if (validProducts.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one product",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Update inventory - first remove old quantities, then add new ones
+    updateInventoryFromOrder(selectedOrder, 'cancel');
+    
+    const updatedOrder = {
+      ...modifyForm,
+      products: validProducts
+    };
+    
+    // Update inventory with new quantities
+    updateInventoryFromOrder(updatedOrder, 'order');
+    
+    // Update calendar orders
+    setCalendarOrders(prev => {
+      const updated = { ...prev };
+      const date = selectedOrder.orderDate;
+      
+      if (updated[date]) {
+        updated[date] = updated[date].map(order => 
+          order.orderId === selectedOrder.orderId ? updatedOrder : order
+        );
+      }
+      
+      return updated;
+    });
+    
+    setSelectedOrder(updatedOrder);
+    setModifyDialogOpen(false);
+    setModifyForm(null);
+    
+    toast({
+      title: "Order Modified",
+      description: `Order #${updatedOrder.orderId} has been updated successfully`
+    });
+  };
+  
   const updateOrderStatus = (status: 'pending' | 'processing' | 'completed' | 'cancelled') => {
     if (!selectedOrder) return;
+    
+    // For cancel, update inventory by removing ordered quantities
+    if (status === 'cancelled') {
+      updateInventoryFromOrder(selectedOrder, 'cancel');
+    }
+    
+    // For complete, create a sales ID and update inventory available quantities
+    if (status === 'completed') {
+      // Generate Sales ID in the format SYYYYMM00000
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const prefix = `S${year}${month}`;
+      const salesId = getNextOrderId(prefix);
+      
+      // Update inventory - move from ordered to available
+      updateInventoryFromOrder(selectedOrder, 'complete');
+      
+      // Update the order with completed status and salesId
+      const updatedOrder = { 
+        ...selectedOrder, 
+        status, 
+        salesId 
+      };
+      
+      // Update calendar orders
+      setCalendarOrders(prev => {
+        const updated = { ...prev };
+        const date = selectedOrder.orderDate;
+        
+        if (updated[date]) {
+          updated[date] = updated[date].map(order => 
+            order.orderId === selectedOrder.orderId ? updatedOrder : order
+          );
+        }
+        
+        return updated;
+      });
+      
+      setSelectedOrder(updatedOrder);
+      
+      toast({
+        title: "Order Completed",
+        description: `Order #${selectedOrder.orderId} completed and Sales ID ${salesId} generated`
+      });
+      
+      return;
+    }
     
     // Update order status
     const updatedOrder = { ...selectedOrder, status };
@@ -284,13 +527,16 @@ const OrderCalendar = () => {
     const dateString = format(day, 'yyyy-MM-dd');
     const dayOrders = calendarOrders[dateString] || [];
     
+    // Count pending orders
+    const pendingOrders = dayOrders.filter(order => order.status === 'pending').length;
+    
     if (dayOrders.length > 0) {
       return (
         <div className="flex flex-col items-center">
           <div>{format(day, 'd')}</div>
-          {dayOrders.length > 0 && (
+          {pendingOrders > 0 && (
             <Badge variant="secondary" className="mt-1">
-              {dayOrders.length}
+              {pendingOrders}
             </Badge>
           )}
         </div>
@@ -334,7 +580,7 @@ const OrderCalendar = () => {
           </CardHeader>
           <CardContent>
             <div className="flex justify-center">
-              <CalendarComponent
+              <Calendar
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
@@ -343,7 +589,7 @@ const OrderCalendar = () => {
                   selected: { fontWeight: "bold" }
                 }}
                 components={{
-                  DayContent: ({ date, activeModifiers }) => renderDayContent(date)
+                  DayContent: ({ date }) => renderDayContent(date)
                 }}
               />
             </div>
@@ -379,16 +625,24 @@ const OrderCalendar = () => {
                         <div className="flex flex-col">
                           <span className="font-medium">{order.customerName}</span>
                           <span className="text-sm text-gray-500">Order #{order.orderId}</span>
+                          {order.salesId && (
+                            <span className="text-xs text-gray-500">Sales ID: {order.salesId}</span>
+                          )}
                         </div>
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
                       </div>
                       
-                      <div className="mt-2">
+                      <div className="mt-2 flex justify-between">
                         <span className="text-sm text-gray-500">
                           {order.products.length} products
                         </span>
+                        {order.advanceAmount > 0 && (
+                          <span className="text-sm text-green-600">
+                            Advance: ₹{order.advanceAmount.toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -410,15 +664,27 @@ const OrderCalendar = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Customer</h3>
                 <p>{selectedOrder.customerName}</p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Date</h3>
+                <h3 className="text-sm font-medium text-gray-500">Order Date</h3>
                 <p>{format(new Date(selectedOrder.orderDate), 'MMMM d, yyyy')}</p>
               </div>
+              {selectedOrder.advanceAmount > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Advance Payment</h3>
+                  <p className="text-green-600">₹{selectedOrder.advanceAmount.toLocaleString()}</p>
+                </div>
+              )}
+              {selectedOrder.salesId && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Sales ID</h3>
+                  <p>{selectedOrder.salesId}</p>
+                </div>
+              )}
             </div>
             
             <div>
@@ -450,6 +716,12 @@ const OrderCalendar = () => {
                         </td>
                       </tr>
                     ))}
+                    <tr>
+                      <td colSpan={3} className="px-6 py-4 text-right font-medium">Total Amount:</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                        ₹{selectedOrder.products.reduce((sum, product) => sum + (product.salesPrice * product.quantity), 0).toLocaleString()}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -464,7 +736,7 @@ const OrderCalendar = () => {
           </CardContent>
           <CardFooter className="flex justify-between border-t p-4">
             <div>
-              {selectedOrder.status !== 'cancelled' && (
+              {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'completed' && (
                 <Button variant="destructive" onClick={() => updateOrderStatus('cancelled')}>
                   Cancel Order
                 </Button>
@@ -473,14 +745,22 @@ const OrderCalendar = () => {
             
             <div className="flex space-x-2">
               {selectedOrder.status === 'pending' && (
-                <Button variant="outline" onClick={() => updateOrderStatus('processing')}>
-                  Mark Processing
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleModifyOrder}>
+                    Modify Order
+                  </Button>
+                  <Button variant="outline" onClick={() => updateOrderStatus('processing')}>
+                    Mark Processing
+                  </Button>
+                  <Button onClick={() => updateOrderStatus('completed')}>
+                    <Check className="h-4 w-4 mr-2" /> Complete Order
+                  </Button>
+                </>
               )}
               
               {selectedOrder.status === 'processing' && (
                 <Button onClick={() => updateOrderStatus('completed')}>
-                  <Check className="h-4 w-4 mr-2" /> Mark Completed
+                  <Check className="h-4 w-4 mr-2" /> Complete Order
                 </Button>
               )}
               
@@ -495,7 +775,7 @@ const OrderCalendar = () => {
       )}
       
       <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Create New Order</DialogTitle>
             <DialogDescription>
@@ -622,6 +902,157 @@ const OrderCalendar = () => {
             </Button>
             <Button onClick={handleSubmitOrder}>
               <Save className="h-4 w-4 mr-2" /> Create Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={modifyDialogOpen} onOpenChange={setModifyDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Modify Order #{modifyForm?.orderId}</DialogTitle>
+            <DialogDescription>
+              Update order details for {modifyForm?.customerName}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {modifyForm && (
+            <div className="grid gap-4 py-4">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <Label>Products</Label>
+                  <Button variant="outline" size="sm" onClick={addModifyProductRow}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Product
+                  </Button>
+                </div>
+                
+                <div className="border rounded-md overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {modifyForm.products.map((product, index) => (
+                        <tr key={index}>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <Select
+                              value={product.productId ? String(product.productId) : ""}
+                              onValueChange={(value) => handleModifyProductChange(index, value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select product">
+                                  {product.productName || "Select product"}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((p) => (
+                                  <SelectItem key={p.productId} value={p.productId.toString()}>
+                                    {p.productName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <Input
+                              type="number"
+                              value={product.salesPrice || ""}
+                              onChange={(e) => handleModifyPriceChange(index, e.target.value)}
+                              placeholder="Price"
+                              disabled={!product.productId}
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <Input
+                              type="number"
+                              value={product.quantity || ""}
+                              onChange={(e) => handleModifyQuantityChange(index, e.target.value)}
+                              placeholder="Qty"
+                              disabled={!product.productId}
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                            ₹{(product.salesPrice * product.quantity).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeModifyProductRow(index)}
+                              disabled={modifyForm.products.length === 1}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="remarks">Remarks</Label>
+                <Textarea
+                  id="remarks"
+                  placeholder="Add any notes or special instructions for this order"
+                  value={modifyForm.remarks}
+                  onChange={(e) => setModifyForm({...modifyForm, remarks: e.target.value})}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModifyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveModifiedOrder}>
+              <Save className="h-4 w-4 mr-2" /> Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={advanceAmountDialogOpen} onOpenChange={setAdvanceAmountDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Advance Payment</DialogTitle>
+            <DialogDescription>
+              Enter advance payment amount for order #{selectedOrder?.orderId}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div>
+              <Label htmlFor="advanceAmount">Advance Amount</Label>
+              <Input
+                id="advanceAmount"
+                type="number"
+                value={advanceAmount || ""}
+                onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter advance amount"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdvanceAmountDialogOpen(false)}>
+              Skip
+            </Button>
+            <Button onClick={handleAdvanceAmountSubmit}>
+              <Save className="h-4 w-4 mr-2" /> Apply Advance
             </Button>
           </DialogFooter>
         </DialogContent>
