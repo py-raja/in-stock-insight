@@ -66,6 +66,21 @@ export type Order = {
   salesId?: string;
 };
 
+export interface PurchaseItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  purchasePrice: number;
+}
+
+export interface Purchase {
+  purchaseId: string;
+  supplierName: string;
+  purchaseDate: string;
+  products: PurchaseItem[];
+  totalAmount: number;
+}
+
 export interface ProductPrice {
   productId: number;
   productName: string;
@@ -627,4 +642,17 @@ export const updateCustomerBalance = (customerId: number, amount: number) => {
     customer.amountReceived += amount;
     customer.amountBalance = customer.totalSales - customer.amountReceived;
   }
+};
+
+// Helper function to update inventory from purchase
+export const updateInventoryFromPurchase = (purchase: Purchase) => {
+  purchase.products.forEach(purchaseItem => {
+    const product = products.find(p => p.productId === purchaseItem.productId);
+    
+    if (product) {
+      // Update available quantity when new purchase is added
+      product.availableQuantity += purchaseItem.quantity;
+      product.actualQuantity = product.availableQuantity - product.orderedQuantity;
+    }
+  });
 };

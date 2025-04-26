@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Trash, Save, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -19,7 +20,7 @@ import {
   Product,
   PurchaseItem,
   purchases,
-  Purchase as PurchaseType,
+  Purchase,
   getNextPurchaseId,
   updateInventoryFromPurchase
 } from '@/services/mockData';
