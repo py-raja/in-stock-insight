@@ -480,7 +480,7 @@ export const getNextOrderId = (prefix: string = 'O') => {
   
   let maxOrderNum = 0;
   
-  if (prefix.startsWith('O')) {
+  if (prefix === 'O') {
     orders.forEach(order => {
       if (order.orderId.startsWith(basePrefix)) {
         const orderNum = parseInt(order.orderId.slice(basePrefix.length));
@@ -489,10 +489,10 @@ export const getNextOrderId = (prefix: string = 'O') => {
         }
       }
     });
-  } else {
-    orders.forEach(order => {
-      if (order.salesId && order.salesId.startsWith(basePrefix)) {
-        const orderNum = parseInt(order.salesId.slice(basePrefix.length));
+  } else if (prefix === 'S') {
+    sales.forEach(sale => {
+      if (sale.salesId.startsWith(basePrefix)) {
+        const orderNum = parseInt(sale.salesId.slice(basePrefix.length));
         if (orderNum > maxOrderNum) {
           maxOrderNum = orderNum;
         }

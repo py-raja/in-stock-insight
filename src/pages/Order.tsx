@@ -81,6 +81,7 @@ const OrderCalendar = () => {
   // Form state for new order
   const [orderForm, setOrderForm] = useState({
     customerId: '',
+    orderDate: format(selectedDate, 'yyyy-MM-dd'),
     products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
     remarks: '',
     status: 'pending',
@@ -97,6 +98,7 @@ const OrderCalendar = () => {
   const handleNewOrder = () => {
     setOrderForm({
       customerId: '',
+      orderDate: format(selectedDate, 'yyyy-MM-dd'),
       products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
       remarks: '',
       status: 'pending',
@@ -162,6 +164,13 @@ const OrderCalendar = () => {
     setOrderForm({
       ...orderForm,
       products: updatedProducts,
+    });
+  };
+  
+  const handleOrderDateChange = (date: Date) => {
+    setOrderForm({
+      ...orderForm,
+      orderDate: format(date, 'yyyy-MM-dd')
     });
   };
   
@@ -296,15 +305,11 @@ const OrderCalendar = () => {
     const customer = customers.find(c => c.customerId.toString() === orderForm.customerId);
     if (!customer) return;
     
-    // Generate Order ID in the format OYYYYMM00000
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const prefix = `O${year}${month}`;
-    const nextId = getNextOrderId(prefix);
+    // Generate Order ID
+    const nextId = getNextOrderId('O');
     
     // Create new order
-    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    const formattedDate = orderForm.orderDate;
     const newOrder: OrderType = {
       orderId: nextId,
       orderDate: formattedDate,
@@ -328,6 +333,7 @@ const OrderCalendar = () => {
     
     setOrderForm({
       customerId: '',
+      orderDate: format(selectedDate, 'yyyy-MM-dd'),
       products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
       remarks: '',
       status: 'pending',
@@ -453,12 +459,8 @@ const OrderCalendar = () => {
     
     // For complete, create a sales ID and update inventory available quantities
     if (status === 'completed') {
-      // Generate Sales ID in the format SYYYYMM00000
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const prefix = `S${year}${month}`;
-      const salesId = getNextOrderId(prefix);
+      // Generate Sales ID
+      const salesId = getNextOrderId('S');
       
       // Update inventory - move from ordered to available
       updateInventoryFromOrder(selectedOrder, 'complete');
@@ -749,9 +751,6 @@ const OrderCalendar = () => {
                   <Button variant="outline" onClick={handleModifyOrder}>
                     Modify Order
                   </Button>
-                  <Button variant="outline" onClick={() => updateOrderStatus('processing')}>
-                    Mark Processing
-                  </Button>
                   <Button onClick={() => updateOrderStatus('completed')}>
                     <Check className="h-4 w-4 mr-2" /> Complete Order
                   </Button>
@@ -779,7 +778,7 @@ const OrderCalendar = () => {
           <DialogHeader>
             <DialogTitle>Create New Order</DialogTitle>
             <DialogDescription>
-              Add a new order for {format(selectedDate, 'MMMM d, yyyy')}.
+              Add a new order for delivery.
             </DialogDescription>
           </DialogHeader>
           
@@ -801,6 +800,32 @@ const OrderCalendar = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="orderDate">Order Date</Label>
+              <div className="flex w-full max-w-sm items-center space-x-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {orderForm.orderDate ? format(new Date(orderForm.orderDate), 'MMMM d, yyyy') : <span>Select date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={orderForm.orderDate ? new Date(orderForm.orderDate) : undefined}
+                      onSelect={(date) => date && handleOrderDateChange(date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
             
             <div>
