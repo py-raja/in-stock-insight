@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash, Save, Check, X } from 'lucide-react';
@@ -82,7 +81,7 @@ const OrderCalendar = () => {
   const [orderForm, setOrderForm] = useState({
     customerId: '',
     orderDate: format(selectedDate, 'yyyy-MM-dd'),
-    products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
+    products: Array(3).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
     remarks: '',
     status: 'pending',
     advanceAmount: 0
@@ -99,7 +98,7 @@ const OrderCalendar = () => {
     setOrderForm({
       customerId: '',
       orderDate: format(selectedDate, 'yyyy-MM-dd'),
-      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
+      products: Array(3).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
       remarks: '',
       status: 'pending',
       advanceAmount: 0
@@ -111,7 +110,7 @@ const OrderCalendar = () => {
     setOrderForm({
       ...orderForm,
       customerId,
-      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
+      products: Array(3).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
     });
   };
   
@@ -334,7 +333,7 @@ const OrderCalendar = () => {
     setOrderForm({
       customerId: '',
       orderDate: format(selectedDate, 'yyyy-MM-dd'),
-      products: Array(5).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
+      products: Array(3).fill({ productId: 0, productName: '', salesPrice: 0, quantity: 0 }),
       remarks: '',
       status: 'pending',
       advanceAmount: 0
@@ -459,42 +458,42 @@ const OrderCalendar = () => {
     
     // For complete, create a sales ID and update inventory available quantities
     if (status === 'completed') {
-      // Generate Sales ID
-      const salesId = getNextOrderId('S');
+    // Generate Sales ID using the next available ID
+    const salesId = getNextOrderId('S');
+    
+    // Update inventory - move from ordered to available
+    updateInventoryFromOrder(selectedOrder, 'complete');
+    
+    // Update the order with completed status and salesId
+    const updatedOrder = { 
+      ...selectedOrder, 
+      status, 
+      salesId 
+    };
+    
+    // Update calendar orders
+    setCalendarOrders(prev => {
+      const updated = { ...prev };
+      const date = selectedOrder.orderDate;
       
-      // Update inventory - move from ordered to available
-      updateInventoryFromOrder(selectedOrder, 'complete');
+      if (updated[date]) {
+        updated[date] = updated[date].map(order => 
+          order.orderId === selectedOrder.orderId ? updatedOrder : order
+        );
+      }
       
-      // Update the order with completed status and salesId
-      const updatedOrder = { 
-        ...selectedOrder, 
-        status, 
-        salesId 
-      };
-      
-      // Update calendar orders
-      setCalendarOrders(prev => {
-        const updated = { ...prev };
-        const date = selectedOrder.orderDate;
-        
-        if (updated[date]) {
-          updated[date] = updated[date].map(order => 
-            order.orderId === selectedOrder.orderId ? updatedOrder : order
-          );
-        }
-        
-        return updated;
-      });
-      
-      setSelectedOrder(updatedOrder);
-      
-      toast({
-        title: "Order Completed",
-        description: `Order #${selectedOrder.orderId} completed and Sales ID ${salesId} generated`
-      });
-      
-      return;
-    }
+      return updated;
+    });
+    
+    setSelectedOrder(updatedOrder);
+    
+    toast({
+      title: "Order Completed",
+      description: `Order #${selectedOrder.orderId} completed and Sales ID ${salesId} generated`
+    });
+    
+    return;
+  }
     
     // Update order status
     const updatedOrder = { ...selectedOrder, status };
@@ -774,162 +773,165 @@ const OrderCalendar = () => {
       )}
       
       <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Create New Order</DialogTitle>
-            <DialogDescription>
-              Add a new order for delivery.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label htmlFor="customer">Customer</Label>
-              <Select
-                value={orderForm.customerId}
-                onValueChange={handleCustomerChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.customerId} value={customer.customerId.toString()}>
-                      {customer.customerName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        
+    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Create New Order</DialogTitle>
+        <DialogDescription>
+          Add a new order for delivery.
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="customer">Customer</Label>
+            <Select
+              value={orderForm.customerId}
+              onValueChange={handleCustomerChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.customerId} value={customer.customerId.toString()}>
+                    {customer.customerName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div>
-              <Label htmlFor="orderDate">Order Date</Label>
-              <div className="flex w-full max-w-sm items-center space-x-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {orderForm.orderDate ? format(new Date(orderForm.orderDate), 'MMMM d, yyyy') : <span>Select date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={orderForm.orderDate ? new Date(orderForm.orderDate) : undefined}
-                      onSelect={(date) => date && handleOrderDateChange(date)}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <Label>Products</Label>
-                <Button variant="outline" size="sm" onClick={addProductRow}>
-                  <Plus className="h-4 w-4 mr-2" /> Add Product
-                </Button>
-              </div>
-              
-              <div className="border rounded-md overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {orderForm.products.map((product, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <Select
-                            value={product.productId ? String(product.productId) : ""}
-                            onValueChange={(value) => handleProductChange(index, value)}
-                            disabled={!orderForm.customerId}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map((p) => (
-                                <SelectItem key={p.productId} value={p.productId.toString()}>
-                                  {p.productName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={product.salesPrice || ""}
-                            onChange={(e) => handlePriceChange(index, e.target.value)}
-                            placeholder="Price"
-                            disabled={!product.productId}
-                            className="w-24"
-                          />
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={product.quantity || ""}
-                            onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            placeholder="Qty"
-                            disabled={!product.productId}
-                            className="w-24"
-                          />
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                          ₹{(product.salesPrice * product.quantity).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeProductRow(index)}
-                            disabled={orderForm.products.length === 1}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                placeholder="Add any notes or special instructions for this order"
-                value={orderForm.remarks}
-                onChange={(e) => setOrderForm({...orderForm, remarks: e.target.value})}
-                rows={3}
-              />
+          <div>
+            <Label htmlFor="orderDate">Order Date</Label>
+            <div className="flex w-full items-center space-x-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {orderForm.orderDate ? format(new Date(orderForm.orderDate), 'MMMM d, yyyy') : <span>Select date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={orderForm.orderDate ? new Date(orderForm.orderDate) : undefined}
+                    onSelect={(date) => date && handleOrderDateChange(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
+        </div>
+        
+        <div className="relative">
+          <div className="flex justify-between items-center mb-2">
+            <Label>Products</Label>
+            <Button variant="outline" size="sm" onClick={addProductRow}>
+              <Plus className="h-4 w-4 mr-2" /> Add Product
+            </Button>
+          </div>
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOrderDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitOrder}>
-              <Save className="h-4 w-4 mr-2" /> Create Order
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+          <div className="max-h-[400px] overflow-y-auto border rounded-md">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orderForm.products.map((product, index) => (
+                  <tr key={index}>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <Select
+                        value={product.productId ? String(product.productId) : ""}
+                        onValueChange={(value) => handleProductChange(index, value)}
+                        disabled={!orderForm.customerId}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p) => (
+                            <SelectItem key={p.productId} value={p.productId.toString()}>
+                              {p.productName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <Input
+                        type="number"
+                        value={product.salesPrice || ""}
+                        onChange={(e) => handlePriceChange(index, e.target.value)}
+                        placeholder="Price"
+                        disabled={!product.productId}
+                        className="w-24"
+                      />
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <Input
+                        type="number"
+                        value={product.quantity || ""}
+                        onChange={(e) => handleQuantityChange(index, e.target.value)}
+                        placeholder="Qty"
+                        disabled={!product.productId}
+                        className="w-24"
+                      />
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                      ₹{(product.salesPrice * product.quantity).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeProductRow(index)}
+                        disabled={orderForm.products.length <= 3}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div>
+          <Label htmlFor="remarks">Remarks</Label>
+          <Textarea
+            id="remarks"
+            placeholder="Add any notes or special instructions for this order"
+            value={orderForm.remarks}
+            onChange={(e) => setOrderForm({...orderForm, remarks: e.target.value})}
+            rows={3}
+          />
+        </div>
+      </div>
+      
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setOrderDialogOpen(false)}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmitOrder}>
+          <Save className="h-4 w-4 mr-2" /> Create Order
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  
       </Dialog>
       
       <Dialog open={modifyDialogOpen} onOpenChange={setModifyDialogOpen}>
@@ -955,143 +957,4 @@ const OrderCalendar = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {modifyForm.products.map((product, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2 whitespace-nowrap">
-                            <Select
-                              value={product.productId ? String(product.productId) : ""}
-                              onValueChange={(value) => handleModifyProductChange(index, value)}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select product">
-                                  {product.productName || "Select product"}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((p) => (
-                                  <SelectItem key={p.productId} value={p.productId.toString()}>
-                                    {p.productName}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap">
-                            <Input
-                              type="number"
-                              value={product.salesPrice || ""}
-                              onChange={(e) => handleModifyPriceChange(index, e.target.value)}
-                              placeholder="Price"
-                              disabled={!product.productId}
-                              className="w-24"
-                            />
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap">
-                            <Input
-                              type="number"
-                              value={product.quantity || ""}
-                              onChange={(e) => handleModifyQuantityChange(index, e.target.value)}
-                              placeholder="Qty"
-                              disabled={!product.productId}
-                              className="w-24"
-                            />
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                            ₹{(product.salesPrice * product.quantity).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeModifyProductRow(index)}
-                              disabled={modifyForm.products.length === 1}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="remarks">Remarks</Label>
-                <Textarea
-                  id="remarks"
-                  placeholder="Add any notes or special instructions for this order"
-                  value={modifyForm.remarks}
-                  onChange={(e) => setModifyForm({...modifyForm, remarks: e.target.value})}
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModifyDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveModifiedOrder}>
-              <Save className="h-4 w-4 mr-2" /> Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={advanceAmountDialogOpen} onOpenChange={setAdvanceAmountDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Advance Payment</DialogTitle>
-            <DialogDescription>
-              Enter advance payment amount for order #{selectedOrder?.orderId}.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label htmlFor="advanceAmount">Advance Amount</Label>
-              <Input
-                id="advanceAmount"
-                type="number"
-                value={advanceAmount || ""}
-                onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
-                placeholder="Enter advance amount"
-                className="mt-1"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAdvanceAmountDialogOpen(false)}>
-              Skip
-            </Button>
-            <Button onClick={handleAdvanceAmountSubmit}>
-              <Save className="h-4 w-4 mr-2" /> Apply Advance
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-const Order = () => {
-  return (
-    <div>
-      <OrderCalendar />
-    </div>
-  );
-};
-
-export default Order;
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-5
