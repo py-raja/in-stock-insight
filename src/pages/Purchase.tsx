@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Trash, Save, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -20,7 +19,7 @@ import {
   Product,
   PurchaseItem,
   purchases,
-  Purchase,
+  type Purchase,
   getNextPurchaseId,
   updateInventoryFromPurchase
 } from '@/services/mockData';
@@ -34,19 +33,19 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-const Purchase = () => {
+const PurchasePage = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [purchaseData, setPurchaseData] = useState<PurchaseType[]>([...purchases]);
-  const [editedRow, setEditedRow] = useState<PurchaseType | null>(null);
+  const [purchaseData, setPurchaseData] = useState<Purchase[]>([...purchases]);
+  const [editedRow, setEditedRow] = useState<Purchase | null>(null);
   
   const filteredPurchases = purchaseData.filter(purchase =>
     purchase.purchaseId.toLowerCase().includes(searchTerm.toLowerCase()) ||
     purchase.supplierName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (purchase: PurchaseType) => {
+  const handleEdit = (purchase: Purchase) => {
     setEditedRow({ ...purchase });
   };
 
@@ -77,7 +76,7 @@ const Purchase = () => {
     setEditMode(!editMode);
   };
 
-  const handleInputChange = (field: keyof PurchaseType, value: string | number) => {
+  const handleInputChange = (field: keyof Purchase, value: string | number) => {
     if (editedRow) {
       setEditedRow({
         ...editedRow,
@@ -91,23 +90,23 @@ const Purchase = () => {
   const columns = [
     { 
       header: 'Purchase ID', 
-      accessorKey: 'purchaseId' as keyof PurchaseType
+      accessorKey: 'purchaseId' as keyof Purchase
     },
     { 
       header: 'Supplier Name', 
-      accessorKey: 'supplierName' as keyof PurchaseType
+      accessorKey: 'supplierName' as keyof Purchase
     },
     { 
       header: 'Purchase Date', 
-      accessorKey: 'purchaseDate' as keyof PurchaseType 
+      accessorKey: 'purchaseDate' as keyof Purchase 
     },
     { 
       header: 'Total Amount', 
-      accessorKey: 'totalAmount' as keyof PurchaseType
+      accessorKey: 'totalAmount' as keyof Purchase
     },
     {
       header: 'Actions',
-      accessorKey: (row: PurchaseType) => {
+      accessorKey: (row: Purchase) => {
         if (editMode) {
           if (editedRow && editedRow.purchaseId === row.purchaseId) {
             return (
@@ -221,7 +220,7 @@ const Purchase = () => {
     // Create new purchase with next available ID
     const nextId = getNextPurchaseId();
     const totalAmount = calculateTotalAmount();
-    const purchaseToAdd: PurchaseType = {
+    const purchaseToAdd: Purchase = {
       purchaseId: nextId,
       supplierName: supplierName,
       purchaseDate: new Date().toISOString().split('T')[0], // Current date
@@ -341,7 +340,7 @@ const Purchase = () => {
     // Update purchase with edited values
     if (editedRow) {
       const totalAmount = calculateEditTotalAmount();
-      const purchaseToUpdate: PurchaseType = {
+      const purchaseToUpdate: Purchase = {
         ...editedRow,
         supplierName: supplierName,
         products: validProducts,
@@ -547,4 +546,4 @@ const Purchase = () => {
   );
 };
 
-export default Purchase;
+export default PurchasePage;
