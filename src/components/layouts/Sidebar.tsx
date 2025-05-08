@@ -10,7 +10,8 @@ import {
   Receipt, 
   FileText, 
   BarChart, 
-  Calendar 
+  Calendar,
+  User
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const menuItems: MenuItem[] = [
   { name: 'Purchase', path: '/purchase', icon: ShoppingCart },
   { name: 'Inventory', path: '/inventory', icon: Database },
   { name: 'Customer', path: '/customer', icon: Users },
+  { name: 'Supplier', path: '/supplier', icon: User },
   { name: 'Product Price', path: '/product-price', icon: Tag },
   { name: 'Sales', path: '/sales', icon: Receipt },
   { name: 'Billing', path: '/billing', icon: FileText },
