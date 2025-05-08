@@ -14,14 +14,14 @@ interface Column<T> {
   accessorKey: keyof T | string | ((row: T) => React.ReactNode);
 }
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends object> {
   data: T[];
   columns: Column<T>[];
   isLoading?: boolean;
   emptyMessage?: string;
 }
 
-function DataTable<T>({
+function DataTable<T extends object>({
   data,
   columns,
   isLoading = false,
