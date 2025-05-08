@@ -11,7 +11,7 @@ import {
 
 interface Column<T> {
   header: string;
-  accessorKey: keyof T | ((row: T) => React.ReactNode);
+  accessorKey: keyof T | string | ((row: T) => React.ReactNode);
 }
 
 interface DataTableProps<T> {
@@ -62,7 +62,9 @@ function DataTable<T>({
                 <TableCell key={colIndex}>
                   {typeof column.accessorKey === 'function'
                     ? column.accessorKey(row)
-                    : String(row[column.accessorKey] ?? '')}
+                    : typeof column.accessorKey === 'string' && column.accessorKey in row
+                    ? String(row[column.accessorKey as keyof typeof row] ?? '')
+                    : ''}
                 </TableCell>
               ))}
             </TableRow>
