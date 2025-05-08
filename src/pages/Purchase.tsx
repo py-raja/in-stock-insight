@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Trash, Save, Check, X } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -12,17 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import DataTable from '@/components/common/DataTable';
-import PageHeader from '@/components/common/PageHeader';
-import { 
-  products as availableProducts, 
-  Product,
-  PurchaseItem,
-  purchases,
-  type Purchase,
-  getNextPurchaseId,
-  updateInventoryFromPurchase
-} from '@/services/mockData';
 import {
   Dialog,
   DialogContent,
@@ -32,511 +21,331 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import PageHeader from '@/components/common/PageHeader';
+import DataTable from '@/components/common/DataTable';
+import { getPurchasesFromDetails, getNextPurchaseId, getCompanyNames, getProductsByCompany } from '@/services/mockData';
+import { PlusCircle, X, Save } from 'lucide-react';
 
-const PurchasePage = () => {
+const Purchase = () => {
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [editMode, setEditMode] = useState(false);
-  const [purchaseData, setPurchaseData] = useState<Purchase[]>([...purchases]);
-  const [editedRow, setEditedRow] = useState<Purchase | null>(null);
+  const [purchases, setPurchases] = useState(getPurchasesFromDetails());
   
-  const filteredPurchases = purchaseData.filter(purchase =>
-    purchase.purchaseId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    purchase.supplierName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleEdit = (purchase: Purchase) => {
-    setEditedRow({ ...purchase });
-  };
-
-  const saveChanges = () => {
-    if (editedRow) {
-      const updatedPurchases = purchaseData.map(item =>
-        item.purchaseId === editedRow.purchaseId ? editedRow : item
-      );
-      setPurchaseData(updatedPurchases);
-      setEditedRow(null);
-      
-      toast({
-        title: "Purchase Updated",
-        description: `${editedRow.purchaseId} has been updated successfully`,
-      });
-    }
-  };
-
-  const cancelEdit = () => {
-    setEditedRow(null);
-  };
-
-  const toggleEditMode = () => {
-    if (editMode && editedRow) {
-      // If we're exiting edit mode but there's an active edit, cancel it
-      setEditedRow(null);
-    }
-    setEditMode(!editMode);
-  };
-
-  const handleInputChange = (field: keyof Purchase, value: string | number) => {
-    if (editedRow) {
-      setEditedRow({
-        ...editedRow,
-        [field]: typeof value === 'string' && !isNaN(Number(value)) 
-          ? value
-          : value
-      });
-    }
-  };
-
-  const columns = [
-    { 
-      header: 'Purchase ID', 
-      accessorKey: 'purchaseId' as keyof Purchase
-    },
-    { 
-      header: 'Supplier Name', 
-      accessorKey: 'supplierName' as keyof Purchase
-    },
-    { 
-      header: 'Purchase Date', 
-      accessorKey: 'purchaseDate' as keyof Purchase 
-    },
-    { 
-      header: 'Total Amount', 
-      accessorKey: 'totalAmount' as keyof Purchase
-    },
-    {
-      header: 'Actions',
-      accessorKey: (row: Purchase) => {
-        if (editMode) {
-          if (editedRow && editedRow.purchaseId === row.purchaseId) {
-            return (
-              <div className="flex space-x-2">
-                <Button variant="ghost" size="sm" onClick={saveChanges} className="text-green-600">
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={cancelEdit} className="text-red-600">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            );
-          }
-          return (
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(row)}>
-              Edit
-            </Button>
-          );
-        }
-        return null;
-      },
-    },
-  ];
-
-  // New purchase dialog state
-  const [newPurchaseDialogOpen, setNewPurchaseDialogOpen] = useState(false);
-  const [supplierName, setSupplierName] = useState('');
-  const [products, setProducts] = useState<PurchaseItem[]>([
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-  ]);
-
-  const handleProductChange = (index: number, field: "productName" | "quantity" | "purchasePrice", value: string) => {
-    const updatedProducts = [...products];
+  // New purchase form state
+  const [showNewPurchaseForm, setShowNewPurchaseForm] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [purchaseItems, setPurchaseItems] = useState<Array<{
+    productId: number;
+    productName: string;
+    quantity: number;
+    purchasePrice: number;
+  }>>([]);
+  
+  // Company names for dropdown
+  const companyNames = getCompanyNames();
+  
+  // Available products for selected company
+  const availableProducts = selectedCompany 
+    ? getProductsByCompany(selectedCompany) 
+    : [];
+  
+  const handleAddPurchaseItem = () => {
+    if (availableProducts.length === 0) return;
     
-    if (field === "productName") {
-      // Update product name
-      const product = availableProducts.find((p) => p.productId === parseInt(value));
-      if (product) {
-        updatedProducts[index] = {
-          ...updatedProducts[index],
-          productId: product.productId,
-          productName: product.productName,
-          purchasePrice: product.defaultSalesPrice,
-        };
+    const product = availableProducts[0];
+    setPurchaseItems([
+      ...purchaseItems,
+      {
+        productId: product.productId,
+        productName: product.productName,
+        quantity: 1,
+        purchasePrice: 0
       }
-    } else if (field === "quantity") {
-      // Update quantity
-      updatedProducts[index] = {
-        ...updatedProducts[index],
-        quantity: parseInt(value) || 0,
-      };
-    } else if (field === "purchasePrice") {
-      // Update purchase price
-      updatedProducts[index] = {
-        ...updatedProducts[index],
-        purchasePrice: parseFloat(value) || 0,
-      };
-    }
-    
-    setProducts(updatedProducts);
-  };
-
-  const addProductRow = () => {
-    setProducts([
-      ...products,
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
     ]);
   };
-
-  const removeProductRow = (index: number) => {
-    const updatedProducts = [...products];
-    updatedProducts.splice(index, 1);
-    setProducts(updatedProducts);
+  
+  const handleRemovePurchaseItem = (index: number) => {
+    setPurchaseItems(purchaseItems.filter((_, i) => i !== index));
   };
-
-  const calculateTotalAmount = () => {
-    return products.reduce((total, product) => {
-      return total + (product.purchasePrice * product.quantity);
-    }, 0);
-  };
-
-  const addNewPurchase = async () => {
-    // Validate fields
-    if (!supplierName) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter the supplier name.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Filter out products with no product name or zero quantity
-    const validProducts = products.filter(
-      p => p.productName && p.quantity > 0 && p.purchasePrice > 0
-    );
-
-    if (validProducts.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please add at least one product with valid quantity and price.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Create new purchase with next available ID
-    const nextId = getNextPurchaseId();
-    const totalAmount = calculateTotalAmount();
-    const purchaseToAdd: Purchase = {
-      purchaseId: nextId,
-      supplierName: supplierName,
-      purchaseDate: new Date().toISOString().split('T')[0], // Current date
-      products: validProducts,
-      totalAmount: totalAmount,
+  
+  const handlePurchaseItemChange = (index: number, field: string, value: string | number) => {
+    const updatedItems = [...purchaseItems];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: typeof value === 'string' && field !== 'productName' ? parseFloat(value) : value
     };
-
-    // Add to purchase
-    setPurchaseData([purchaseToAdd, ...purchaseData]);
+    setPurchaseItems(updatedItems);
+  };
+  
+  const handleCreatePurchase = () => {
+    // Validation
+    if (!selectedCompany) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a company",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    // Update inventory
-    updateInventoryFromPurchase(purchaseToAdd);
-
-    // Reset form and close dialog
-    setSupplierName('');
-    setProducts([
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    ]);
-    setNewPurchaseDialogOpen(false);
+    if (purchaseItems.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one product",
+        variant: "destructive"
+      });
+      return;
+    }
     
+    const invalidItems = purchaseItems.filter(
+      item => item.quantity <= 0 || item.purchasePrice <= 0
+    );
+    
+    if (invalidItems.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: "All products must have valid quantity and price",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Calculate total
+    const totalAmount = purchaseItems.reduce(
+      (sum, item) => sum + (item.quantity * item.purchasePrice), 
+      0
+    );
+    
+    // Create new purchase
+    const newPurchase = {
+      purchaseId: getNextPurchaseId(),
+      supplierName: selectedCompany,
+      purchaseDate,
+      products: purchaseItems,
+      totalAmount
+    };
+    
+    // Update state
+    setPurchases([newPurchase, ...purchases]);
+    
+    // Reset form
+    setSelectedCompany('');
+    setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
+    setPurchaseItems([]);
+    setShowNewPurchaseForm(false);
+    
+    // Notify user
     toast({
-      title: "Purchase Added",
-      description: `Purchase ${purchaseToAdd.purchaseId} has been added`
+      title: "Purchase Created",
+      description: `Purchase ${newPurchase.purchaseId} has been created successfully`
     });
   };
-
-  // Edit product dialog state
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editProducts, setEditProducts] = useState<PurchaseItem[]>([
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-  ]);
-
-  const handleEditProduct = (index: number, field: "productName" | "quantity" | "purchasePrice", value: string) => {
-    const updatedEditProducts = [...editProducts];
-    
-    if (field === "productName") {
-      // Update product name
-      const productId = parseInt(value);
-      const product = availableProducts.find((p) => p.productId === productId);
-      if (product) {
-        updatedEditProducts[index] = {
-          ...updatedEditProducts[index],
-          productId: product.productId,
-          productName: product.productName,
-          purchasePrice: product.defaultSalesPrice,
-        };
-      }
-    } else if (field === "quantity") {
-      // Update quantity
-      updatedEditProducts[index] = {
-        ...updatedEditProducts[index],
-        quantity: parseInt(value) || 0,
-      };
-    } else if (field === "purchasePrice") {
-      // Update purchase price
-      updatedEditProducts[index] = {
-        ...updatedEditProducts[index],
-        purchasePrice: parseFloat(value) || 0,
-      };
+  
+  // DataTable columns
+  const columns = [
+    { header: 'Purchase ID', accessorKey: 'purchaseId' },
+    { header: 'Supplier', accessorKey: 'supplierName' },
+    { header: 'Date', accessorKey: 'purchaseDate' },
+    { header: 'Total Amount', accessorKey: (row: any) => `₹${row.totalAmount.toLocaleString()}` },
+    { 
+      header: 'Actions', 
+      accessorKey: (row: any) => (
+        <Button variant="ghost" size="sm" onClick={() => {
+          // View purchase details (placeholder)
+          toast({
+            title: "View Purchase",
+            description: `Viewing details for ${row.purchaseId}`
+          });
+        }}>
+          View
+        </Button>
+      )
     }
-    
-    setEditProducts(updatedEditProducts);
-  };
-
-  const addEditProductRow = () => {
-    setEditProducts([
-      ...editProducts,
-      { productId: 0, productName: "", quantity: 0, purchasePrice: 0 },
-    ]);
-  };
-
-  const removeEditProductRow = (index: number) => {
-    const updatedEditProducts = [...editProducts];
-    updatedEditProducts.splice(index, 1);
-    setEditProducts(updatedEditProducts);
-  };
-
-  const calculateEditTotalAmount = () => {
-    return editProducts.reduce((total, product) => {
-      return total + (product.purchasePrice * product.quantity);
-    }, 0);
-  };
-
-  const editPurchase = async () => {
-    // Validate fields
-    if (!supplierName) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter the supplier name.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Filter out products with no product name or zero quantity
-    const validProducts = editProducts.filter(
-      p => p.productName && p.quantity > 0 && p.purchasePrice > 0
-    );
-
-    if (validProducts.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please add at least one product with valid quantity and price.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Update purchase with edited values
-    if (editedRow) {
-      const totalAmount = calculateEditTotalAmount();
-      const purchaseToUpdate: Purchase = {
-        ...editedRow,
-        supplierName: supplierName,
-        products: validProducts,
-        totalAmount: totalAmount,
-      };
-
-      const updatedPurchases = purchaseData.map(item =>
-        item.purchaseId === editedRow.purchaseId ? purchaseToUpdate : item
-      );
-
-      setPurchaseData(updatedPurchases);
-      setEditedRow(null);
-      setEditDialogOpen(false);
-
-      toast({
-        title: "Purchase Updated",
-        description: `Purchase ${purchaseToUpdate.purchaseId} has been updated`
-      });
-    }
-  };
-
+  ];
+  
   return (
     <div>
       <PageHeader 
         title="Purchase Management" 
-        subtitle="Track incoming stock and supplier details"
+        subtitle="Record and manage product purchases"
         actions={
-          <>
-            <Dialog open={newPurchaseDialogOpen} onOpenChange={setNewPurchaseDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <PlusCircle className="h-4 w-4 mr-2" /> Add Purchase
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Purchase</DialogTitle>
-                  <DialogDescription>
-                    Enter details for the new purchase to add to inventory.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Supplier Name</label>
-                    <Input
-                      placeholder="Enter supplier name"
-                      value={supplierName}
-                      onChange={(e) => setSupplierName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Products</label>
-                    {products.map((product, index) => (
-                      <div key={index} className="grid grid-cols-4 gap-4 items-center">
-                        <Select
-                          value={product.productName}
-                          onValueChange={(value) => handleProductChange(index, "productName", value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableProducts.map((p) => (
-                              <SelectItem key={p.productId} value={p.productId.toString()}>
-                                {p.productName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          placeholder="Quantity"
-                          value={product.quantity ? product.quantity.toString() : ""}
-                          onChange={(e) => handleProductChange(index, "quantity", e.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Purchase Price"
-                          value={product.purchasePrice ? product.purchasePrice.toString() : ""}
-                          onChange={(e) => handleProductChange(index, "purchasePrice", e.target.value)}
-                        />
-                        <Button variant="ghost" size="sm" onClick={() => removeProductRow(index)} className="text-red-500 hover:text-red-700">
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={addProductRow}>
-                      <PlusCircle className="h-4 w-4 mr-2" /> Add Product
-                    </Button>
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setNewPurchaseDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={addNewPurchase}>Add Purchase</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Purchase</DialogTitle>
-                  <DialogDescription>
-                    Edit details for the purchase.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Supplier Name</label>
-                    <Input
-                      placeholder="Enter supplier name"
-                      value={supplierName}
-                      onChange={(e) => setSupplierName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Products</label>
-                    {editProducts.map((product, index) => (
-                      <div key={index} className="grid grid-cols-4 gap-4 items-center">
-                        <Select
-                          value={product.productName}
-                          onValueChange={(value) => handleEditProduct(index, "productName", value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableProducts.map((p) => (
-                              <SelectItem key={p.productId} value={p.productId.toString()}>
-                                {p.productName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          placeholder="Quantity"
-                          value={product.quantity ? product.quantity.toString() : ""}
-                          onChange={(e) => handleEditProduct(index, "quantity", e.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Purchase Price"
-                          value={product.purchasePrice ? product.purchasePrice.toString() : ""}
-                          onChange={(e) => handleEditProduct(index, "purchasePrice", e.target.value)}
-                        />
-                        <Button variant="ghost" size="sm" onClick={() => removeEditProductRow(index)} className="text-red-500 hover:text-red-700">
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={addEditProductRow}>
-                      <PlusCircle className="h-4 w-4 mr-2" /> Add Product
-                    </Button>
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={editPurchase}>Edit Purchase</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            <Button
-              variant={editMode ? "default" : "outline"}
-              onClick={toggleEditMode}
-              disabled={editedRow !== null}
-            >
-              {editMode ? "Save All" : "Edit Purchase"}
-            </Button>
-          </>
+          <Button onClick={() => setShowNewPurchaseForm(true)}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            New Purchase
+          </Button>
         }
       />
       
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex mb-6">
-            <div className="relative w-full max-w-sm">
-              {/* Search Icon */}
-              <Input
-                placeholder="Search purchases..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+      <Dialog open={showNewPurchaseForm} onOpenChange={setShowNewPurchaseForm}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Create New Purchase</DialogTitle>
+            <DialogDescription>
+              Enter the details for the new purchase.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-4">
+              <div className="space-y-2 flex-1">
+                <label className="text-sm font-medium">Supplier</label>
+                <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companyNames.map(company => (
+                      <SelectItem key={company} value={company}>{company}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2 flex-1">
+                <label className="text-sm font-medium">Purchase Date</label>
+                <Input 
+                  type="date" 
+                  value={purchaseDate} 
+                  onChange={(e) => setPurchaseDate(e.target.value)} 
+                />
+              </div>
+            </div>
+            
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-medium">Products</h3>
+                <Button 
+                  size="sm" 
+                  onClick={handleAddPurchaseItem}
+                  disabled={!selectedCompany || availableProducts.length === 0}
+                >
+                  <PlusCircle className="h-4 w-4 mr-1" /> Add Product
+                </Button>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {purchaseItems.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Select 
+                          value={item.productId.toString()} 
+                          onValueChange={(value) => {
+                            const product = availableProducts.find(
+                              p => p.productId.toString() === value
+                            );
+                            if (product) {
+                              handlePurchaseItemChange(index, 'productId', product.productId);
+                              handlePurchaseItemChange(index, 'productName', product.productName);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableProducts.map(product => (
+                              <SelectItem 
+                                key={product.productId} 
+                                value={product.productId.toString()}
+                              >
+                                {product.productName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          value={item.quantity} 
+                          onChange={(e) => handlePurchaseItemChange(index, 'quantity', e.target.value)} 
+                          className="w-20"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          value={item.purchasePrice} 
+                          onChange={(e) => handlePurchaseItemChange(index, 'purchasePrice', e.target.value)} 
+                          className="w-24"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        ₹{(item.quantity * item.purchasePrice).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleRemovePurchaseItem(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {purchaseItems.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                        {!selectedCompany 
+                          ? "Select a supplier to add products" 
+                          : "Click 'Add Product' to add items to this purchase"}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              
+              {purchaseItems.length > 0 && (
+                <div className="flex justify-end mt-2">
+                  <div className="bg-muted px-4 py-2 rounded-md">
+                    <span className="font-medium">Total: </span>
+                    <span>₹
+                      {purchaseItems.reduce(
+                        (sum, item) => sum + (item.quantity * item.purchasePrice), 
+                        0
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
-          <DataTable
-            data={filteredPurchases}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewPurchaseForm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePurchase}>
+              <Save className="h-4 w-4 mr-2" />
+              Create Purchase
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Card>
+        <CardContent className="pt-6">
+          <DataTable 
+            data={purchases}
             columns={columns}
             emptyMessage="No purchases found"
           />
@@ -546,4 +355,4 @@ const PurchasePage = () => {
   );
 };
 
-export default PurchasePage;
+export default Purchase;

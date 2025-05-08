@@ -89,6 +89,12 @@ export interface ProductPrice {
   };
 }
 
+import { Supplier, SupplierTransaction } from '@/types/supplier';
+import { PurchaseProduct, SalesProduct } from '@/types/productPrice';
+
+// Add new types to the export
+export type { Supplier, SupplierTransaction, PurchaseProduct, SalesProduct };
+
 // Sample data
 export const customers: Customer[] = [
   {
@@ -450,6 +456,271 @@ export const orders: Order[] = [
   }
 ];
 
+// Add suppliers mock data
+export const suppliers: Supplier[] = [
+  {
+    supplierId: 1,
+    supplierName: 'ABC Distributors',
+    balanceAmount: 15000,
+    crateBalance: 25
+  },
+  {
+    supplierId: 2,
+    supplierName: 'XYZ Wholesalers',
+    balanceAmount: 8700,
+    crateBalance: 15
+  },
+  {
+    supplierId: 3,
+    supplierName: 'PQR Supplies',
+    balanceAmount: 22500,
+    crateBalance: 30
+  }
+];
+
+// Add supplier transactions mock data
+export const supplierTransactions: SupplierTransaction[] = [
+  {
+    transactionId: 'ST20240401001',
+    supplierId: 1,
+    supplierName: 'ABC Distributors',
+    date: '2024-04-01',
+    openingAmount: 12000,
+    billAmount: 8000,
+    paid: 5000,
+    damage: 0,
+    balance: 15000,
+    crateOpening: 20,
+    crateSupply: 10,
+    crateReturn: 5,
+    crateBalance: 25
+  },
+  {
+    transactionId: 'ST20240401002',
+    supplierId: 2,
+    supplierName: 'XYZ Wholesalers',
+    date: '2024-04-01',
+    openingAmount: 7500,
+    billAmount: 6200,
+    paid: 5000,
+    damage: 0,
+    balance: 8700,
+    crateOpening: 12,
+    crateSupply: 8,
+    crateReturn: 5,
+    crateBalance: 15
+  },
+  {
+    transactionId: 'ST20240402001',
+    supplierId: 3,
+    supplierName: 'PQR Supplies',
+    date: '2024-04-02',
+    openingAmount: 18000,
+    billAmount: 9500,
+    paid: 5000,
+    damage: 0,
+    balance: 22500,
+    crateOpening: 25,
+    crateSupply: 15,
+    crateReturn: 10,
+    crateBalance: 30
+  }
+];
+
+// Add purchase products data
+export const purchaseProducts: PurchaseProduct[] = [
+  {
+    productId: 1,
+    supplierId: 1,
+    supplierName: 'ABC Distributors',
+    productName: 'Milk',
+    productWeight: '500ml',
+    incentiveAmount: 2,
+    purchaseRate: 25,
+    productType: 'Dairy',
+    priceHistory: [
+      { date: '2024-03-01', price: 23 },
+      { date: '2024-04-01', price: 25 }
+    ]
+  },
+  {
+    productId: 2,
+    supplierId: 1,
+    supplierName: 'ABC Distributors',
+    productName: 'Butter',
+    productWeight: '100g',
+    incentiveAmount: 1,
+    purchaseRate: 45,
+    productType: 'Dairy',
+    priceHistory: [
+      { date: '2024-03-01', price: 42 },
+      { date: '2024-04-01', price: 45 }
+    ]
+  },
+  {
+    productId: 3,
+    supplierId: 2,
+    supplierName: 'XYZ Wholesalers',
+    productName: 'Cheese',
+    productWeight: '200g',
+    incentiveAmount: 3,
+    purchaseRate: 120,
+    productType: 'Dairy',
+    priceHistory: [
+      { date: '2024-03-01', price: 115 },
+      { date: '2024-04-01', price: 120 }
+    ]
+  },
+  {
+    productId: 4,
+    supplierId: 3,
+    supplierName: 'PQR Supplies',
+    productName: 'Yogurt',
+    productWeight: '400g',
+    incentiveAmount: 1.5,
+    purchaseRate: 35,
+    productType: 'Dairy',
+    priceHistory: [
+      { date: '2024-03-01', price: 32 },
+      { date: '2024-04-01', price: 35 }
+    ]
+  },
+  {
+    productId: 5,
+    supplierId: 3,
+    supplierName: 'PQR Supplies',
+    productName: 'Cream',
+    productWeight: '200ml',
+    incentiveAmount: 2,
+    purchaseRate: 70,
+    productType: 'Dairy',
+    priceHistory: [
+      { date: '2024-03-01', price: 65 },
+      { date: '2024-04-01', price: 70 }
+    ]
+  }
+];
+
+// Add sales products data
+export const salesProducts: SalesProduct[] = [
+  {
+    productId: 1,
+    productName: 'Milk',
+    defaultSalesPrice: 30,
+    priceHistory: [
+      { date: '2024-03-01', price: 28 },
+      { date: '2024-04-01', price: 30 }
+    ],
+    customerPrices: {
+      1: 29,
+      2: 30,
+      3: 31,
+      4: 30,
+      5: 32
+    }
+  },
+  {
+    productId: 2,
+    productName: 'Butter',
+    defaultSalesPrice: 55,
+    priceHistory: [
+      { date: '2024-03-01', price: 52 },
+      { date: '2024-04-01', price: 55 }
+    ],
+    customerPrices: {
+      1: 54,
+      2: 55,
+      3: 56,
+      4: 55,
+      5: 57
+    }
+  },
+  {
+    productId: 3,
+    productName: 'Cheese',
+    defaultSalesPrice: 150,
+    priceHistory: [
+      { date: '2024-03-01', price: 145 },
+      { date: '2024-04-01', price: 150 }
+    ],
+    customerPrices: {
+      1: 145,
+      2: 150,
+      3: 152,
+      4: 150,
+      5: 155
+    }
+  },
+  {
+    productId: 4,
+    productName: 'Yogurt',
+    defaultSalesPrice: 45,
+    priceHistory: [
+      { date: '2024-03-01', price: 42 },
+      { date: '2024-04-01', price: 45 }
+    ],
+    customerPrices: {
+      1: 44,
+      2: 45,
+      3: 46,
+      4: 45,
+      5: 47
+    }
+  },
+  {
+    productId: 5,
+    productName: 'Cream',
+    defaultSalesPrice: 90,
+    priceHistory: [
+      { date: '2024-03-01', price: 85 },
+      { date: '2024-04-01', price: 90 }
+    ],
+    customerPrices: {
+      1: 88,
+      2: 90,
+      3: 92,
+      4: 90,
+      5: 95
+    }
+  }
+];
+
+// Helper functions for suppliers
+export const getNextSupplierId = (): number => {
+  return suppliers.length > 0 ? 
+    Math.max(...suppliers.map(supplier => supplier.supplierId)) + 1 : 1;
+};
+
+export const getSupplierById = (supplierId: number): Supplier | undefined => {
+  return suppliers.find(supplier => supplier.supplierId === supplierId);
+};
+
+export const getSupplierTransactions = (supplierId: number, date?: string): SupplierTransaction[] => {
+  return supplierTransactions.filter(transaction => 
+    transaction.supplierId === supplierId &&
+    (date ? transaction.date === date : true)
+  );
+};
+
+// Helper functions for product pricing
+export const getPurchaseProductById = (productId: number): PurchaseProduct | undefined => {
+  return purchaseProducts.find(product => product.productId === productId);
+};
+
+export const getSalesProductById = (productId: number): SalesProduct | undefined => {
+  return salesProducts.find(product => product.productId === productId);
+};
+
+export const getNextProductId = (): number => {
+  const productIds = [
+    ...products.map(p => p.productId),
+    ...purchaseProducts.map(p => p.productId),
+    ...salesProducts.map(p => p.productId)
+  ];
+  
+  return productIds.length > 0 ? Math.max(...productIds) + 1 : 1;
+};
+
 // Helper functions
 export const getNextPurchaseId = (): string => {
   const date = new Date();
@@ -507,11 +778,6 @@ export const getNextOrderId = (prefix: string = 'O') => {
 export const getNextCustomerId = (): number => {
   return customers.length > 0 ? 
     Math.max(...customers.map(customer => customer.customerId)) + 1 : 1;
-};
-
-export const getNextProductId = (): number => {
-  return products.length > 0 ? 
-    Math.max(...products.map(product => product.productId)) + 1 : 1;
 };
 
 // Functions to get data
@@ -655,4 +921,22 @@ export const updateInventoryFromPurchase = (purchase: Purchase) => {
       product.actualQuantity = product.availableQuantity - product.orderedQuantity;
     }
   });
+};
+
+// Fix for the Purchase type mismatch
+
+// Convert PurchaseDetail to Purchase for compatibility
+export const getPurchasesFromDetails = (): Purchase[] => {
+  return purchases.map(detail => ({
+    purchaseId: detail.purchaseId,
+    supplierName: detail.companyName,
+    purchaseDate: detail.purchaseDate,
+    products: detail.products.map(p => ({
+      productId: p.productId,
+      productName: p.productName,
+      quantity: p.quantity,
+      purchasePrice: p.purchasePrice
+    })),
+    totalAmount: detail.products.reduce((sum, p) => sum + (p.purchasePrice * p.quantity), 0)
+  }));
 };
