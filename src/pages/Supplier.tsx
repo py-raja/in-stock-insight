@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
@@ -330,7 +329,7 @@ const SupplierPage: React.FC = () => {
               <SelectValue placeholder="Select supplier" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Suppliers</SelectItem>
+              <SelectItem value="all">All Suppliers</SelectItem>
               {suppliersData.map(supplier => (
                 <SelectItem key={supplier.supplierId} value={supplier.supplierId.toString()}>
                   {supplier.supplierName}
