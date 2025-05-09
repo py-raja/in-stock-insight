@@ -137,7 +137,7 @@ const PurchaseDetails = ({ purchases, onViewPurchase }: PurchaseDetailsProps) =>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Companies</SelectItem>
+                  <SelectItem value="all">All Companies</SelectItem>
                   {companyNames.map(company => (
                     <SelectItem key={company} value={company}>{company}</SelectItem>
                   ))}

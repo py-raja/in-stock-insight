@@ -131,7 +131,8 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
           ...updatedItems[index],
           productId: product.productId,
           productName: product.productName,
-          purchasePrice: product.purchasePrice || 0
+          // Use default price if purchasePrice doesn't exist on product
+          purchasePrice: product.hasOwnProperty('purchasePrice') ? (product as any).purchasePrice : 0
         };
       }
     } else {
@@ -225,7 +226,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Purchase ID</label>
-            <Input value={purchaseId} disabled />
+            <Input value={purchaseId.toString()} disabled />
           </div>
           
           <div className="space-y-2">
@@ -335,9 +336,9 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                 <TableRow key={index}>
                   <TableCell>
                     <Select 
-                      value={item.productId ? item.productId.toString() : ""} 
+                      value={item.productId ? item.productId.toString() : "none"} 
                       onValueChange={(value) => {
-                        if (value) {
+                        if (value && value !== "none") {
                           handleItemChange(index, 'productId', parseInt(value));
                         }
                       }}
@@ -347,6 +348,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                         <SelectValue placeholder="Select product" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">Select a product</SelectItem>
                         {availableProducts.map(product => (
                           <SelectItem 
                             key={product.productId} 

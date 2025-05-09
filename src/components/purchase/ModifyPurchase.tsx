@@ -119,7 +119,8 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
           ...updatedItems[index],
           productId: product.productId,
           productName: product.productName,
-          purchasePrice: updatedItems[index].purchasePrice || product.purchasePrice || 0
+          purchasePrice: updatedItems[index].purchasePrice || 
+                         (product.hasOwnProperty('purchasePrice') ? (product as any).purchasePrice : 0)
         };
       }
     } else {
@@ -269,7 +270,7 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Purchase ID</label>
-                <Input value={selectedPurchase.purchaseId} disabled />
+                <Input value={selectedPurchase.purchaseId.toString()} disabled />
               </div>
               
               <div className="space-y-2">
@@ -328,9 +329,9 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
                     <TableRow key={index}>
                       <TableCell>
                         <Select 
-                          value={item.productId ? item.productId.toString() : ""} 
+                          value={item.productId ? item.productId.toString() : "none"} 
                           onValueChange={(value) => {
-                            if (value) {
+                            if (value && value !== "none") {
                               handleItemChange(index, 'productId', parseInt(value));
                             }
                           }}
@@ -339,6 +340,7 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="none">Select a product</SelectItem>
                             {availableProducts.map(product => (
                               <SelectItem 
                                 key={product.productId} 
