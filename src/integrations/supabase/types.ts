@@ -9,7 +9,156 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      purchase_items: {
+        Row: {
+          created_at: string
+          item_id: number
+          product_id: number
+          product_name: string
+          purchase_id: number | null
+          purchase_price: number
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          item_id?: number
+          product_id: number
+          product_name: string
+          purchase_id?: number | null
+          purchase_price?: number
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          item_id?: number
+          product_id?: number
+          product_name?: string
+          purchase_id?: number | null
+          purchase_price?: number
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_items_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["purchase_id"]
+          },
+        ]
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          purchase_date: string
+          purchase_id: number
+          supplier_id: number
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          purchase_date?: string
+          purchase_id?: number
+          supplier_id: number
+          total_amount?: number
+        }
+        Update: {
+          created_at?: string
+          purchase_date?: string
+          purchase_id?: number
+          supplier_id?: number
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      supplier_transactions: {
+        Row: {
+          balance: number
+          bill_amount: number
+          crate_balance: number
+          crate_opening: number
+          crate_return: number
+          crate_supply: number
+          created_at: string
+          damage: number
+          date: string
+          opening_amount: number
+          paid: number
+          supplier_id: number
+          transaction_id: string
+        }
+        Insert: {
+          balance?: number
+          bill_amount?: number
+          crate_balance?: number
+          crate_opening?: number
+          crate_return?: number
+          crate_supply?: number
+          created_at?: string
+          damage?: number
+          date?: string
+          opening_amount?: number
+          paid?: number
+          supplier_id: number
+          transaction_id?: string
+        }
+        Update: {
+          balance?: number
+          bill_amount?: number
+          crate_balance?: number
+          crate_opening?: number
+          crate_return?: number
+          crate_supply?: number
+          created_at?: string
+          damage?: number
+          date?: string
+          opening_amount?: number
+          paid?: number
+          supplier_id?: number
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_transactions_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          balance_amount: number
+          crate_balance: number
+          created_at: string
+          supplier_id: number
+          supplier_name: string
+        }
+        Insert: {
+          balance_amount?: number
+          crate_balance?: number
+          created_at?: string
+          supplier_id?: number
+          supplier_name: string
+        }
+        Update: {
+          balance_amount?: number
+          crate_balance?: number
+          created_at?: string
+          supplier_id?: number
+          supplier_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

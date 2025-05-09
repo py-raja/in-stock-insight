@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -23,44 +22,37 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, PlusCircle, Trash2, Save, Edit, Search, Database, Server, User } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, Save, Edit, Search, Database, Server, User, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import TabsContainer from '@/components/common/TabsContent';
 import DataTable from '@/components/common/DataTable';
-import { suppliers, supplierTransactions, getNextSupplierId } from '@/services/mockData';
 import { Supplier, SupplierTransaction } from '@/types/supplier';
+import { SupplierDB, SupplierTransactionDB } from '@/types/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 const SupplierPage: React.FC = () => {
   const { toast } = useToast();
-  // SQL equivalent: SELECT * FROM suppliers ORDER BY supplier_name;
-  const [suppliersData, setSuppliersData] = useState<Supplier[]>([...suppliers]);
   
-  // SQL equivalent: 
-  // SELECT st.*, s.supplier_name 
-  // FROM supplier_transactions st
-  // JOIN suppliers s ON st.supplier_id = s.supplier_id
-  // ORDER BY st.date DESC;
-  const [transactions, setTransactions] = useState<SupplierTransaction[]>([...supplierTransactions]);
+  // State variables for data
+  const [suppliersData, setSuppliersData] = useState<Supplier[]>([]);
+  const [transactions, setTransactions] = useState<SupplierTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
+  // State variables for UI
   const [action, setAction] = useState<'add' | 'modify' | 'delete' | null>(null);
   const [selectedSuppliers, setSelectedSuppliers] = useState<number[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
   const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({
     supplierName: '',
   });
   
-  // Add supplier dialog
+  // Dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  
-  // Modify supplier dialog
   const [modifyDialogOpen, setModifyDialogOpen] = useState(false);
   const [supplierToModify, setSupplierToModify] = useState<Supplier | null>(null);
-  
-  // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
-  // Add transaction dialog
   const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
   const [newTransaction, setNewTransaction] = useState<Partial<SupplierTransaction>>({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -75,8 +67,74 @@ const SupplierPage: React.FC = () => {
     crateReturn: 0
   });
   
-  const handleAddSupplier = () => {
-    // SQL equivalent: INSERT INTO suppliers (supplier_name) VALUES ($1) RETURNING supplier_id;
+  // Fetch suppliers and transactions from Supabase
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        // Fetch suppliers
+        const { data: suppliersData, error: suppliersError } = await supabase
+          .from('suppliers')
+          .select('*')
+          .order('supplier_name');
+          
+        if (suppliersError) {
+          throw suppliersError;
+        }
+        
+        // Map DB format to frontend format
+        const mappedSuppliers: Supplier[] = suppliersData.map((supplier: SupplierDB) => ({
+          supplierId: supplier.supplier_id,
+          supplierName: supplier.supplier_name,
+          balanceAmount: supplier.balance_amount,
+          crateBalance: supplier.crate_balance
+        }));
+        
+        // Fetch transactions
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('supplier_transactions')
+          .select('*, suppliers(supplier_name)')
+          .order('date', { ascending: false });
+          
+        if (transactionsError) {
+          throw transactionsError;
+        }
+        
+        // Map DB format to frontend format
+        const mappedTransactions: SupplierTransaction[] = transactionsData.map((transaction: any) => ({
+          transactionId: transaction.transaction_id,
+          supplierId: transaction.supplier_id,
+          supplierName: transaction.suppliers.supplier_name,
+          date: transaction.date,
+          openingAmount: transaction.opening_amount,
+          billAmount: transaction.bill_amount,
+          paid: transaction.paid,
+          damage: transaction.damage,
+          balance: transaction.balance,
+          crateOpening: transaction.crate_opening,
+          crateSupply: transaction.crate_supply,
+          crateReturn: transaction.crate_return,
+          crateBalance: transaction.crate_balance
+        }));
+        
+        setSuppliersData(mappedSuppliers);
+        setTransactions(mappedTransactions);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Data Fetch Error",
+          description: "Could not load data from the database.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchData();
+  }, [toast]);
+  
+  const handleAddSupplier = async () => {
     if (!newSupplier.supplierName?.trim()) {
       toast({
         title: "Validation Error",
@@ -86,43 +144,94 @@ const SupplierPage: React.FC = () => {
       return;
     }
     
-    const newId = getNextSupplierId();
-    const supplierToAdd: Supplier = {
-      supplierId: newId,
-      supplierName: newSupplier.supplierName,
-      balanceAmount: 0,
-      crateBalance: 0
-    };
-    
-    setSuppliersData([...suppliersData, supplierToAdd]);
-    setNewSupplier({ supplierName: '' });
-    setAddDialogOpen(false);
-    
-    toast({
-      title: "Supplier Added",
-      description: `${supplierToAdd.supplierName} has been added successfully`
-    });
+    setIsSubmitting(true);
+    try {
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('suppliers')
+        .insert([{
+          supplier_name: newSupplier.supplierName.trim(),
+          balance_amount: 0,
+          crate_balance: 0
+        }])
+        .select();
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Map the returned data
+      if (data && data[0]) {
+        const newSupplierData: Supplier = {
+          supplierId: data[0].supplier_id,
+          supplierName: data[0].supplier_name,
+          balanceAmount: data[0].balance_amount,
+          crateBalance: data[0].crate_balance
+        };
+        
+        setSuppliersData([...suppliersData, newSupplierData]);
+        setNewSupplier({ supplierName: '' });
+        setAddDialogOpen(false);
+        
+        toast({
+          title: "Supplier Added",
+          description: `${newSupplierData.supplierName} has been added successfully`
+        });
+      }
+    } catch (error) {
+      console.error('Error adding supplier:', error);
+      toast({
+        title: "Error",
+        description: "Could not add supplier. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
-  const handleModifySupplier = () => {
-    // SQL equivalent: UPDATE suppliers SET supplier_name=$1 WHERE supplier_id=$2;
+  const handleModifySupplier = async () => {
     if (!supplierToModify) return;
     
-    const updatedSuppliers = suppliersData.map(supplier => 
-      supplier.supplierId === supplierToModify.supplierId ? supplierToModify : supplier
-    );
-    
-    setSuppliersData(updatedSuppliers);
-    setModifyDialogOpen(false);
-    
-    toast({
-      title: "Supplier Updated",
-      description: `${supplierToModify.supplierName} has been updated successfully`
-    });
+    setIsSubmitting(true);
+    try {
+      // Update in Supabase
+      const { error } = await supabase
+        .from('suppliers')
+        .update({ 
+          supplier_name: supplierToModify.supplierName 
+        })
+        .eq('supplier_id', supplierToModify.supplierId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Update local state
+      const updatedSuppliers = suppliersData.map(supplier => 
+        supplier.supplierId === supplierToModify.supplierId ? supplierToModify : supplier
+      );
+      
+      setSuppliersData(updatedSuppliers);
+      setModifyDialogOpen(false);
+      
+      toast({
+        title: "Supplier Updated",
+        description: `${supplierToModify.supplierName} has been updated successfully`
+      });
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      toast({
+        title: "Error",
+        description: "Could not update supplier. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
-  const handleDeleteSuppliers = () => {
-    // SQL equivalent: DELETE FROM suppliers WHERE supplier_id IN ($1, $2, ...);
+  const handleDeleteSuppliers = async () => {
     if (selectedSuppliers.length === 0) {
       toast({
         title: "No Selection",
@@ -132,27 +241,44 @@ const SupplierPage: React.FC = () => {
       return;
     }
     
-    const remainingSuppliers = suppliersData.filter(
-      supplier => !selectedSuppliers.includes(supplier.supplierId)
-    );
-    
-    setSuppliersData(remainingSuppliers);
-    setSelectedSuppliers([]);
-    setDeleteDialogOpen(false);
-    
-    toast({
-      title: "Suppliers Deleted",
-      description: `${selectedSuppliers.length} supplier(s) have been deleted`
-    });
+    setIsSubmitting(true);
+    try {
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('suppliers')
+        .delete()
+        .in('supplier_id', selectedSuppliers);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Update local state
+      const remainingSuppliers = suppliersData.filter(
+        supplier => !selectedSuppliers.includes(supplier.supplierId)
+      );
+      
+      setSuppliersData(remainingSuppliers);
+      setSelectedSuppliers([]);
+      setDeleteDialogOpen(false);
+      
+      toast({
+        title: "Suppliers Deleted",
+        description: `${selectedSuppliers.length} supplier(s) have been deleted`
+      });
+    } catch (error) {
+      console.error('Error deleting suppliers:', error);
+      toast({
+        title: "Error",
+        description: "Could not delete suppliers. They may have related transactions or purchases.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
-  const handleAddTransaction = () => {
-    // SQL equivalent: 
-    // INSERT INTO supplier_transactions 
-    // (supplier_id, date, opening_amount, bill_amount, paid, damage, balance, crate_opening, crate_supply, crate_return, crate_balance) 
-    // VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    // RETURNING transaction_id;
-    
+  const handleAddTransaction = async () => {
     if (!newTransaction.supplierId) {
       toast({
         title: "Validation Error",
@@ -175,60 +301,108 @@ const SupplierPage: React.FC = () => {
                         (newTransaction.crateSupply || 0) - 
                         (newTransaction.crateReturn || 0);
     
-    // Create new transaction with calculated fields
-    const transactionToAdd: SupplierTransaction = {
-      transactionId: `ST${format(new Date(), 'yyyyMMdd')}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      supplierId: newTransaction.supplierId,
-      supplierName: selectedSupplierData.supplierName,
-      date: newTransaction.date || format(new Date(), 'yyyy-MM-dd'),
-      openingAmount: newTransaction.openingAmount || 0,
-      billAmount: newTransaction.billAmount || 0,
-      paid: newTransaction.paid || 0,
-      damage: newTransaction.damage || 0,
-      balance: balance,
-      crateOpening: newTransaction.crateOpening || 0,
-      crateSupply: newTransaction.crateSupply || 0,
-      crateReturn: newTransaction.crateReturn || 0,
-      crateBalance: crateBalance
-    };
-    
-    // Add to transactions
-    setTransactions([transactionToAdd, ...transactions]);
-    
-    // Update supplier balance
-    const updatedSuppliers = suppliersData.map(supplier => {
-      if (supplier.supplierId === newTransaction.supplierId) {
-        return {
-          ...supplier,
-          balanceAmount: balance,
-          crateBalance: crateBalance
-        };
+    setIsSubmitting(true);
+    try {
+      // Insert transaction into Supabase
+      const { data, error } = await supabase
+        .from('supplier_transactions')
+        .insert([{
+          supplier_id: newTransaction.supplierId,
+          date: newTransaction.date,
+          opening_amount: newTransaction.openingAmount || 0,
+          bill_amount: newTransaction.billAmount || 0,
+          paid: newTransaction.paid || 0,
+          damage: newTransaction.damage || 0,
+          balance: balance,
+          crate_opening: newTransaction.crateOpening || 0,
+          crate_supply: newTransaction.crateSupply || 0,
+          crate_return: newTransaction.crateReturn || 0,
+          crate_balance: crateBalance
+        }])
+        .select();
+        
+      if (error) {
+        throw error;
       }
-      return supplier;
-    });
-    
-    setSuppliersData(updatedSuppliers);
-    
-    // Reset form and close dialog
-    setNewTransaction({
-      date: format(new Date(), 'yyyy-MM-dd'),
-      supplierId: 0,
-      supplierName: '',
-      openingAmount: 0,
-      billAmount: 0,
-      paid: 0,
-      damage: 0,
-      crateOpening: 0,
-      crateSupply: 0,
-      crateReturn: 0
-    });
-    
-    setAddTransactionDialogOpen(false);
-    
-    toast({
-      title: "Transaction Added",
-      description: `Transaction for ${selectedSupplierData.supplierName} has been added successfully`
-    });
+      
+      // Update supplier balance in Supabase
+      const { error: supplierError } = await supabase
+        .from('suppliers')
+        .update({ 
+          balance_amount: balance,
+          crate_balance: crateBalance 
+        })
+        .eq('supplier_id', newTransaction.supplierId);
+        
+      if (supplierError) {
+        throw supplierError;
+      }
+      
+      // Map the returned data and update local state
+      if (data && data[0]) {
+        const newTransactionData: SupplierTransaction = {
+          transactionId: data[0].transaction_id,
+          supplierId: data[0].supplier_id,
+          supplierName: selectedSupplierData.supplierName,
+          date: data[0].date,
+          openingAmount: data[0].opening_amount,
+          billAmount: data[0].bill_amount,
+          paid: data[0].paid,
+          damage: data[0].damage,
+          balance: data[0].balance,
+          crateOpening: data[0].crate_opening,
+          crateSupply: data[0].crate_supply,
+          crateReturn: data[0].crate_return,
+          crateBalance: data[0].crate_balance
+        };
+        
+        setTransactions([newTransactionData, ...transactions]);
+        
+        // Update supplier balance in local state
+        const updatedSuppliers = suppliersData.map(supplier => {
+          if (supplier.supplierId === newTransaction.supplierId) {
+            return {
+              ...supplier,
+              balanceAmount: balance,
+              crateBalance: crateBalance
+            };
+          }
+          return supplier;
+        });
+        
+        setSuppliersData(updatedSuppliers);
+        
+        // Reset form and close dialog
+        setNewTransaction({
+          date: format(new Date(), 'yyyy-MM-dd'),
+          supplierId: 0,
+          supplierName: '',
+          openingAmount: 0,
+          billAmount: 0,
+          paid: 0,
+          damage: 0,
+          crateOpening: 0,
+          crateSupply: 0,
+          crateReturn: 0
+        });
+        
+        setAddTransactionDialogOpen(false);
+        
+        toast({
+          title: "Transaction Added",
+          description: `Transaction for ${selectedSupplierData.supplierName} has been added successfully`
+        });
+      }
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      toast({
+        title: "Error",
+        description: "Could not add transaction. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   const handleCheckboxChange = (supplierId: number, checked: boolean) => {
@@ -260,19 +434,13 @@ const SupplierPage: React.FC = () => {
   };
   
   // Filter transactions based on selected supplier and date
-  // SQL equivalent:
-  // SELECT st.*, s.supplier_name 
-  // FROM supplier_transactions st
-  // JOIN suppliers s ON st.supplier_id = s.supplier_id
-  // WHERE ($1::int IS NULL OR st.supplier_id = $1)
-  // AND ($2::date IS NULL OR st.date = $2)
-  // ORDER BY st.date DESC, st.supplier_name;
   const filteredTransactions = transactions.filter(transaction => {
     const supplierMatch = selectedSupplier ? transaction.supplierId === selectedSupplier : true;
     const dateMatch = selectedDate ? transaction.date === format(selectedDate, 'yyyy-MM-dd') : true;
     return supplierMatch && dateMatch;
   });
   
+  // Columns definitions
   const supplierDetailsColumns = [
     { 
       header: 'ID', 
@@ -356,10 +524,17 @@ const SupplierPage: React.FC = () => {
         )}
       </div>
       
-      <DataTable 
-        data={suppliersData} 
-        columns={supplierDetailsColumns}
-      />
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading suppliers...</span>
+        </div>
+      ) : (
+        <DataTable 
+          data={suppliersData} 
+          columns={supplierDetailsColumns}
+        />
+      )}
       
       {/* Add Supplier Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -384,7 +559,10 @@ const SupplierPage: React.FC = () => {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddSupplier}>Add Supplier</Button>
+            <Button onClick={handleAddSupplier} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Add Supplier
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -420,7 +598,10 @@ const SupplierPage: React.FC = () => {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setModifyDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleModifySupplier}>Save Changes</Button>
+            <Button onClick={handleModifySupplier} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -437,7 +618,10 @@ const SupplierPage: React.FC = () => {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteSuppliers}>Delete</Button>
+            <Button variant="destructive" onClick={handleDeleteSuppliers} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -492,7 +676,7 @@ const SupplierPage: React.FC = () => {
         <div className="flex items-end space-x-2">
           <Button className="mt-auto" onClick={() => {
             setSelectedSupplier(null);
-            setSelectedDate(new Date());
+            setSelectedDate(null);
           }}>
             Reset Filters
           </Button>
@@ -510,13 +694,20 @@ const SupplierPage: React.FC = () => {
       
       <Card>
         <CardContent className="pt-6">
-          <div className="overflow-x-auto">
-            <DataTable 
-              data={filteredTransactions}
-              columns={transactionColumns}
-              emptyMessage="No transactions found for the selected filters"
-            />
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading transactions...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <DataTable 
+                data={filteredTransactions}
+                columns={transactionColumns}
+                emptyMessage="No transactions found for the selected filters"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
       
@@ -700,8 +891,11 @@ const SupplierPage: React.FC = () => {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddTransactionDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddTransaction} disabled={!newTransaction.supplierId}>
-              <Server className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={handleAddTransaction} 
+              disabled={!newTransaction.supplierId || isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Server className="h-4 w-4 mr-2" />}
               Add Transaction
             </Button>
           </DialogFooter>
