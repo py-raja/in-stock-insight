@@ -23,7 +23,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, PlusCircle, X, Save, Trash2, Search } from 'lucide-react';
-import { getProductsByCompany } from '@/services/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ModifyPurchaseProps {
   purchases: any[];
@@ -39,6 +39,12 @@ interface PurchaseItem {
   purchasePrice: number;
 }
 
+interface Product {
+  productId: number;
+  productName: string;
+  purchasePrice?: number;
+}
+
 const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selectedPurchaseId }: ModifyPurchaseProps) => {
   const { toast } = useToast();
   
@@ -51,10 +57,21 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selecte
   const [modifiedItems, setModifiedItems] = useState<PurchaseItem[]>([]);
   const [originalItems, setOriginalItems] = useState<PurchaseItem[]>([]);
   
-  // Available products for the selected supplier
-  const availableProducts = selectedPurchase 
-    ? getProductsByCompany(selectedPurchase.supplierName) 
-    : [];
+  // Available products
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  
+  // For now, we'll create mock products since we haven't set up the products table
+  useEffect(() => {
+    const mockProducts: Product[] = [
+      { productId: 1, productName: "Apples", purchasePrice: 10 },
+      { productId: 2, productName: "Oranges", purchasePrice: 15 },
+      { productId: 3, productName: "Bananas", purchasePrice: 8 },
+      { productId: 4, productName: "Grapes", purchasePrice: 20 },
+      { productId: 5, productName: "Strawberries", purchasePrice: 25 }
+    ];
+    
+    setAvailableProducts(mockProducts);
+  }, []);
   
   // Effect to handle when selectedPurchaseId prop changes
   useEffect(() => {
@@ -80,7 +97,7 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selecte
     }
   }, [selectedPurchase]);
   
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchPurchaseId.trim()) {
       toast({
         title: "Validation Error",
@@ -90,15 +107,49 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selecte
       return;
     }
     
-    // SQL: SELECT p.*, s.supplier_name 
-    // FROM purchases p
-    // JOIN suppliers s ON p.supplier_id = s.supplier_id
-    // WHERE p.purchase_id = $1
-    const foundPurchase = purchases.find(p => p.purchaseId.toString() === searchPurchaseId.trim());
-    
-    if (foundPurchase) {
-      setSelectedPurchase(foundPurchase);
-    } else {
+    try {
+      const { data: purchaseData, error: purchaseError } = await supabase
+        .from('purchases')
+        .select(`
+          purchase_id,
+          supplier_id,
+          purchase_date,
+          total_amount,
+          suppliers (supplier_name)
+        `)
+        .eq('purchase_id', searchPurchaseId.trim())
+        .single();
+      
+      if (purchaseError) {
+        throw purchaseError;
+      }
+      
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('purchase_items')
+        .select('*')
+        .eq('purchase_id', purchaseData.purchase_id);
+        
+      if (itemsError) {
+        throw itemsError;
+      }
+      
+      const formattedPurchase = {
+        purchaseId: purchaseData.purchase_id,
+        supplierId: purchaseData.supplier_id,
+        supplierName: purchaseData.suppliers.supplier_name,
+        purchaseDate: purchaseData.purchase_date,
+        totalAmount: purchaseData.total_amount,
+        products: itemsData.map((item: any) => ({
+          productId: item.product_id,
+          productName: item.product_name,
+          quantity: item.quantity,
+          purchasePrice: item.purchase_price,
+        }))
+      };
+      
+      setSelectedPurchase(formattedPurchase);
+    } catch (error) {
+      console.error('Error searching purchase:', error);
       toast({
         title: "Not Found",
         description: `Purchase with ID ${searchPurchaseId} not found`,
@@ -172,38 +223,6 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selecte
       0
     );
     
-    // Update inventory (in a real app, this would be an API call)
-    // SQL: 
-    // -- For each updated product
-    // UPDATE inventory 
-    // SET quantity = quantity + $1 
-    // WHERE product_id = $2
-    const inventoryUpdates = [];
-    
-    // Items removed or quantity decreased
-    for (const original of originalItems) {
-      const modified = validItems.find(item => item.productId === original.productId);
-      if (!modified) {
-        // Item removed
-        inventoryUpdates.push(`Removed ${original.quantity} of ${original.productName}`);
-      } else if (modified.quantity < original.quantity) {
-        // Quantity decreased
-        inventoryUpdates.push(`Decreased ${original.productName} by ${original.quantity - modified.quantity}`);
-      }
-    }
-    
-    // Items added or quantity increased
-    for (const modified of validItems) {
-      const original = originalItems.find(item => item.productId === modified.productId);
-      if (!original) {
-        // Item added
-        inventoryUpdates.push(`Added ${modified.quantity} of ${modified.productName}`);
-      } else if (modified.quantity > original.quantity) {
-        // Quantity increased
-        inventoryUpdates.push(`Increased ${modified.productName} by ${modified.quantity - original.quantity}`);
-      }
-    }
-    
     // Create modified purchase object
     const modifiedPurchase = {
       ...selectedPurchase,
@@ -213,66 +232,14 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selecte
     };
     
     // Update the purchase
-    // SQL: 
-    // UPDATE purchases 
-    // SET supplier_id = $1, purchase_date = $2, total_amount = $3 
-    // WHERE purchase_id = $4;
-    // 
-    // DELETE FROM purchase_items WHERE purchase_id = $1;
-    // 
-    // INSERT INTO purchase_items (purchase_id, product_id, quantity, purchase_price) 
-    // VALUES ($1, $2, $3, $4);
     onModifyPurchase(modifiedPurchase);
-    
-    // Show updates
-    if (inventoryUpdates.length > 0) {
-      toast({
-        title: "Inventory Updated",
-        description: (
-          <ul className="list-disc pl-4 mt-2">
-            {inventoryUpdates.map((update, i) => (
-              <li key={i}>{update}</li>
-            ))}
-          </ul>
-        )
-      });
-    }
-    
-    // Success message
-    toast({
-      title: "Purchase Modified",
-      description: `Purchase #${selectedPurchase.purchaseId} has been updated successfully`
-    });
-    
-    // Reset
-    setSearchPurchaseId('');
-    setSelectedPurchase(null);
   };
   
   const handleDeletePurchase = () => {
     if (!selectedPurchase) return;
     
     // Delete the purchase
-    // SQL:
-    // DELETE FROM purchase_items WHERE purchase_id = $1;
-    // DELETE FROM purchases WHERE purchase_id = $1;
     onDeletePurchase(Number(selectedPurchase.purchaseId));
-    
-    // Show inventory updates
-    toast({
-      title: "Inventory Updated",
-      description: `Removed ${selectedPurchase.products.length} products from inventory`
-    });
-    
-    // Success message
-    toast({
-      title: "Purchase Deleted",
-      description: `Purchase #${selectedPurchase.purchaseId} has been deleted successfully`
-    });
-    
-    // Reset
-    setSearchPurchaseId('');
-    setSelectedPurchase(null);
   };
   
   return (

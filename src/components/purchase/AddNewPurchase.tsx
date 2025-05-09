@@ -1,9 +1,5 @@
 
-// This file should contain implementation for AddNewPurchase component
-// The error is in the handling of numeric inputs where strings are used instead of numbers
-// Make sure the purchaseId and all numeric inputs are properly typed
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -31,12 +27,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { CalendarIcon, PlusCircle, X, Save } from 'lucide-react';
-import { 
-  getNextPurchaseId, 
-  getCompanyNames,
-  getProductsByCompany,
-  updateInventoryFromPurchase 
-} from '@/services/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddNewPurchaseProps {
   onAddPurchase: (purchase: any) => void;
@@ -49,12 +40,24 @@ interface PurchaseItem {
   purchasePrice: number;
 }
 
+interface Supplier {
+  supplier_id: number;
+  supplier_name: string;
+}
+
+interface Product {
+  productId: number;
+  productName: string;
+  purchasePrice?: number;
+}
+
 const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
   const { toast } = useToast();
   
   // Form state
-  const [purchaseId, setPurchaseId] = useState<string>(getNextPurchaseId());
+  const [purchaseId, setPurchaseId] = useState<string>('');
   const [purchaseDate, setPurchaseDate] = useState<Date>(new Date());
+  const [supplierId, setSupplierId] = useState<number | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [items, setItems] = useState<PurchaseItem[]>([
     {
@@ -65,11 +68,50 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
     }
   ]);
   
-  // Available companies for dropdown
-  const companyNames = getCompanyNames();
+  // Available suppliers and products
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   
-  // Available products for the selected supplier
-  const availableProducts = supplierName ? getProductsByCompany(supplierName) : [];
+  // Fetch suppliers from Supabase
+  useEffect(() => {
+    async function fetchSuppliers() {
+      try {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('supplier_id, supplier_name')
+          .order('supplier_name');
+        
+        if (error) {
+          throw error;
+        }
+        
+        setSuppliers(data);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load suppliers",
+          variant: "destructive"
+        });
+      }
+    }
+    
+    fetchSuppliers();
+  }, [toast]);
+  
+  // For now, we'll create mock products since we haven't set up the products table
+  // In a real application, you'd fetch these from the products table
+  useEffect(() => {
+    const mockProducts: Product[] = [
+      { productId: 1, productName: "Apples", purchasePrice: 10 },
+      { productId: 2, productName: "Oranges", purchasePrice: 15 },
+      { productId: 3, productName: "Bananas", purchasePrice: 8 },
+      { productId: 4, productName: "Grapes", purchasePrice: 20 },
+      { productId: 5, productName: "Strawberries", purchasePrice: 25 }
+    ];
+    
+    setAvailableProducts(mockProducts);
+  }, []);
   
   const handleAddRow = () => {
     setItems([
@@ -115,9 +157,17 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
     setItems(updatedItems);
   };
   
+  const handleSupplierChange = (supplierId: string) => {
+    const selectedSupplier = suppliers.find(s => s.supplier_id === parseInt(supplierId));
+    if (selectedSupplier) {
+      setSupplierId(selectedSupplier.supplier_id);
+      setSupplierName(selectedSupplier.supplier_name);
+    }
+  };
+  
   const handleSave = () => {
     // Validation
-    if (!supplierName) {
+    if (!supplierId) {
       toast({
         title: "Validation Error",
         description: "Please select a supplier",
@@ -148,7 +198,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
     
     // Create purchase object
     const purchaseObj = {
-      purchaseId: purchaseId,
+      supplierId,
       supplierName,
       purchaseDate: format(purchaseDate, 'yyyy-MM-dd'),
       products: validItems,
@@ -158,19 +208,9 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
     // Add the purchase
     onAddPurchase(purchaseObj);
     
-    // In a real app, you would update inventory via API
-    // For this mock, we'll just show a message
-    updateInventoryFromPurchase(purchaseObj);
-    
-    // Success message
-    toast({
-      title: "Purchase Added",
-      description: `Purchase #${purchaseId} has been added successfully`
-    });
-    
     // Reset form for next purchase
-    setPurchaseId(getNextPurchaseId());
     setPurchaseDate(new Date());
+    setSupplierId(null);
     setSupplierName("");
     setItems([
       {
@@ -191,11 +231,6 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Purchase ID</label>
-            <Input value={purchaseId.toString()} disabled />
-          </div>
-          
-          <div className="space-y-2">
             <label className="text-sm font-medium">Purchase Date</label>
             <Popover>
               <PopoverTrigger asChild>
@@ -213,6 +248,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                   selected={purchaseDate}
                   onSelect={(date) => date && setPurchaseDate(date)}
                   initialFocus
+                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -221,15 +257,17 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
           <div className="space-y-2">
             <label className="text-sm font-medium">Supplier Name</label>
             <Select
-              value={supplierName}
-              onValueChange={setSupplierName}
+              value={supplierId ? supplierId.toString() : ""}
+              onValueChange={handleSupplierChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
-                {companyNames.map(company => (
-                  <SelectItem key={company} value={company}>{company}</SelectItem>
+                {suppliers.map(supplier => (
+                  <SelectItem key={supplier.supplier_id} value={supplier.supplier_id.toString()}>
+                    {supplier.supplier_name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -242,7 +280,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
             <Button 
               size="sm" 
               onClick={handleAddRow}
-              disabled={!supplierName}
+              disabled={!supplierId}
             >
               <PlusCircle className="h-4 w-4 mr-1" /> Add Row
             </Button>
@@ -269,7 +307,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                           handleItemChange(index, 'productId', parseInt(value));
                         }
                       }}
-                      disabled={!supplierName}
+                      disabled={!supplierId}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select product" />

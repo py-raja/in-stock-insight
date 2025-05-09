@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import DataTable from '@/components/common/DataTable';
-import { getCompanyNames } from '@/services/mockData';
 import { CalendarIcon, Search, FileText, Pencil } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -20,6 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PurchaseDetailsProps {
   purchases: any[];
@@ -35,9 +35,34 @@ const PurchaseDetails = ({ purchases, onViewPurchase }: PurchaseDetailsProps) =>
     productName: '',
   });
   
-  // Company names for dropdown
-  // SQL query equivalent: SELECT DISTINCT company_name FROM suppliers ORDER BY company_name
-  const companyNames = getCompanyNames();
+  const [companyNames, setCompanyNames] = useState<string[]>([]);
+  
+  // Fetch company names from Supabase
+  useEffect(() => {
+    async function fetchCompanyNames() {
+      try {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('supplier_name')
+          .order('supplier_name');
+        
+        if (error) {
+          throw error;
+        }
+        
+        setCompanyNames(data.map(supplier => supplier.supplier_name));
+      } catch (error) {
+        console.error('Error fetching company names:', error);
+      }
+    }
+    
+    fetchCompanyNames();
+  }, []);
+  
+  // Update filtered purchases when purchases prop changes
+  useEffect(() => {
+    setFilteredPurchases(purchases);
+  }, [purchases]);
   
   const handleFilterChange = (key: string, value: any) => {
     const newFilters = { ...filters, [key]: value };
@@ -48,24 +73,6 @@ const PurchaseDetails = ({ purchases, onViewPurchase }: PurchaseDetailsProps) =>
   };
   
   const applyFilters = (currentFilters: typeof filters) => {
-    // SQL query equivalent:
-    // SELECT p.purchase_id, s.supplier_name, p.purchase_date, 
-    //        (SELECT string_agg(product_name, ', ') FROM purchase_items pi 
-    //         JOIN products pr ON pi.product_id = pr.id
-    //         WHERE pi.purchase_id = p.purchase_id) as products,
-    //        p.total_amount
-    // FROM purchases p
-    // JOIN suppliers s ON p.supplier_id = s.id
-    // WHERE 
-    //   ($1 = '' OR p.purchase_id::text ILIKE '%' || $1 || '%') AND
-    //   ($2 = 'all' OR s.supplier_name = $2) AND
-    //   ($3 IS NULL OR p.purchase_date = $3) AND
-    //   ($4 = '' OR EXISTS (SELECT 1 FROM purchase_items pi
-    //                       JOIN products pr ON pi.product_id = pr.id 
-    //                       WHERE pi.purchase_id = p.purchase_id 
-    //                       AND pr.product_name ILIKE '%' || $4 || '%'))
-    // ORDER BY p.purchase_date DESC;
-    
     let filtered = [...purchases];
     
     if (currentFilters.purchaseId) {
@@ -136,10 +143,6 @@ const PurchaseDetails = ({ purchases, onViewPurchase }: PurchaseDetailsProps) =>
             variant="outline" 
             size="sm" 
             onClick={() => {
-              // The below would be handled in Production by:
-              // 1. Setting the active tab to 'modify' via state management
-              // 2. Pre-filling the modify form with the selected purchase data
-              // SQL: SELECT * FROM purchases JOIN purchase_items ON purchases.id = purchase_items.purchase_id WHERE purchases.id = $1
               onViewPurchase(Number(row.purchaseId));
             }}
             className="flex items-center"
