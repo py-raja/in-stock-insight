@@ -29,6 +29,7 @@ interface ModifyPurchaseProps {
   purchases: any[];
   onModifyPurchase: (purchase: any) => void;
   onDeletePurchase: (purchaseId: number) => void;
+  selectedPurchaseId?: number | null;
 }
 
 interface PurchaseItem {
@@ -38,7 +39,7 @@ interface PurchaseItem {
   purchasePrice: number;
 }
 
-const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: ModifyPurchaseProps) => {
+const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase, selectedPurchaseId }: ModifyPurchaseProps) => {
   const { toast } = useToast();
   
   // Search and selected purchase
@@ -55,12 +56,23 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
     ? getProductsByCompany(selectedPurchase.supplierName) 
     : [];
   
+  // Effect to handle when selectedPurchaseId prop changes
+  useEffect(() => {
+    if (selectedPurchaseId) {
+      const foundPurchase = purchases.find(p => Number(p.purchaseId) === selectedPurchaseId);
+      if (foundPurchase) {
+        setSelectedPurchase(foundPurchase);
+      }
+    }
+  }, [selectedPurchaseId, purchases]);
+  
   // When a purchase is selected, initialize the form
   useEffect(() => {
     if (selectedPurchase) {
       setModifiedDate(selectedPurchase.purchaseDate ? new Date(selectedPurchase.purchaseDate) : new Date());
       setModifiedItems([...selectedPurchase.products]);
       setOriginalItems([...selectedPurchase.products]);
+      setSearchPurchaseId(selectedPurchase.purchaseId.toString());
     } else {
       setModifiedDate(null);
       setModifiedItems([]);
@@ -78,6 +90,10 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
       return;
     }
     
+    // SQL: SELECT p.*, s.supplier_name 
+    // FROM purchases p
+    // JOIN suppliers s ON p.supplier_id = s.supplier_id
+    // WHERE p.purchase_id = $1
     const foundPurchase = purchases.find(p => p.purchaseId.toString() === searchPurchaseId.trim());
     
     if (foundPurchase) {
@@ -157,7 +173,11 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
     );
     
     // Update inventory (in a real app, this would be an API call)
-    // For this mock, we'll just show what changes would happen
+    // SQL: 
+    // -- For each updated product
+    // UPDATE inventory 
+    // SET quantity = quantity + $1 
+    // WHERE product_id = $2
     const inventoryUpdates = [];
     
     // Items removed or quantity decreased
@@ -193,6 +213,15 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
     };
     
     // Update the purchase
+    // SQL: 
+    // UPDATE purchases 
+    // SET supplier_id = $1, purchase_date = $2, total_amount = $3 
+    // WHERE purchase_id = $4;
+    // 
+    // DELETE FROM purchase_items WHERE purchase_id = $1;
+    // 
+    // INSERT INTO purchase_items (purchase_id, product_id, quantity, purchase_price) 
+    // VALUES ($1, $2, $3, $4);
     onModifyPurchase(modifiedPurchase);
     
     // Show updates
@@ -224,7 +253,10 @@ const ModifyPurchase = ({ purchases, onModifyPurchase, onDeletePurchase }: Modif
     if (!selectedPurchase) return;
     
     // Delete the purchase
-    onDeletePurchase(selectedPurchase.purchaseId);
+    // SQL:
+    // DELETE FROM purchase_items WHERE purchase_id = $1;
+    // DELETE FROM purchases WHERE purchase_id = $1;
+    onDeletePurchase(Number(selectedPurchase.purchaseId));
     
     // Show inventory updates
     toast({

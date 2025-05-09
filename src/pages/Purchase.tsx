@@ -11,13 +11,19 @@ import { getPurchasesFromDetails } from '@/services/mockData';
 const Purchase = () => {
   const [purchases, setPurchases] = useState(getPurchasesFromDetails());
   const [activeTab, setActiveTab] = useState('details');
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | null>(null);
   
   // Function to handle adding a new purchase
+  // SQL equivalent: INSERT INTO purchases (supplier_id, purchase_date, total_amount) VALUES ($1, $2, $3) RETURNING id;
+  // Then for each product: INSERT INTO purchase_items (purchase_id, product_id, quantity, purchase_price) VALUES ($1, $2, $3, $4);
   const handleAddPurchase = (newPurchase: any) => {
     setPurchases([newPurchase, ...purchases]);
   };
   
   // Function to handle modifying a purchase
+  // SQL equivalent: UPDATE purchases SET supplier_id=$1, purchase_date=$2, total_amount=$3 WHERE id=$4;
+  // Then DELETE FROM purchase_items WHERE purchase_id=$1;
+  // Then for each product: INSERT INTO purchase_items (purchase_id, product_id, quantity, purchase_price) VALUES ($1, $2, $3, $4);
   const handleModifyPurchase = (modifiedPurchase: any) => {
     setPurchases(purchases.map(purchase => 
       purchase.purchaseId === modifiedPurchase.purchaseId ? modifiedPurchase : purchase
@@ -25,8 +31,15 @@ const Purchase = () => {
   };
   
   // Function to handle deleting a purchase
+  // SQL equivalent: DELETE FROM purchase_items WHERE purchase_id=$1; DELETE FROM purchases WHERE id=$1;
   const handleDeletePurchase = (purchaseId: number) => {
-    setPurchases(purchases.filter(purchase => purchase.purchaseId !== purchaseId));
+    setPurchases(purchases.filter(purchase => Number(purchase.purchaseId) !== purchaseId));
+  };
+  
+  // Function to handle viewing a purchase (selects it and changes tab)
+  const handleViewPurchase = (purchaseId: number) => {
+    setSelectedPurchaseId(purchaseId);
+    setActiveTab('modify');
   };
   
   return (
@@ -51,9 +64,7 @@ const Purchase = () => {
           <TabsContent value="details">
             <PurchaseDetails 
               purchases={purchases}
-              onViewPurchase={(purchaseId) => {
-                setActiveTab('modify');
-              }}
+              onViewPurchase={handleViewPurchase}
             />
           </TabsContent>
           
@@ -66,6 +77,7 @@ const Purchase = () => {
               purchases={purchases}
               onModifyPurchase={handleModifyPurchase}
               onDeletePurchase={handleDeletePurchase}
+              selectedPurchaseId={selectedPurchaseId}
             />
           </TabsContent>
         </Tabs>

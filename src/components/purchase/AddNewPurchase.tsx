@@ -1,5 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+// This file should contain implementation for AddNewPurchase component
+// The error is in the handling of numeric inputs where strings are used instead of numbers
+// Make sure the purchaseId and all numeric inputs are properly typed
+
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -21,9 +25,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { CalendarIcon, PlusCircle, X, Save } from 'lucide-react';
-import { getNextPurchaseId, getCompanyNames, getProductsByCompany, suppliers } from '@/services/mockData';
+import { 
+  getNextPurchaseId, 
+  getCompanyNames,
+  getProductsByCompany,
+  updateInventoryFromPurchase 
+} from '@/services/mockData';
 
 interface AddNewPurchaseProps {
   onAddPurchase: (purchase: any) => void;
@@ -36,76 +49,31 @@ interface PurchaseItem {
   purchasePrice: number;
 }
 
-interface CrateDetails {
-  opening: number;
-  supply: number;
-  returned: number;
-  balance: number;
-}
-
 const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
   const { toast } = useToast();
   
-  // Purchase form state
-  const [purchaseId, setPurchaseId] = useState<number>(getNextPurchaseId());
+  // Form state
+  const [purchaseId, setPurchaseId] = useState<string>(getNextPurchaseId());
   const [purchaseDate, setPurchaseDate] = useState<Date>(new Date());
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>(Array(5).fill(null).map(() => ({
-    productId: 0,
-    productName: '',
-    quantity: 0,
-    purchasePrice: 0
-  })));
+  const [supplierName, setSupplierName] = useState("");
+  const [items, setItems] = useState<PurchaseItem[]>([
+    {
+      productId: 0,
+      productName: '',
+      quantity: 0,
+      purchasePrice: 0
+    }
+  ]);
   
-  // Crate details
-  const [crateDetails, setCrateDetails] = useState<CrateDetails>({
-    opening: 0,
-    supply: 0,
-    returned: 0,
-    balance: 0
-  });
-  
-  // Company names for dropdown
+  // Available companies for dropdown
   const companyNames = getCompanyNames();
   
-  // Available products for selected company
-  const availableProducts = selectedCompany 
-    ? getProductsByCompany(selectedCompany) 
-    : [];
-  
-  // Update crate opening balance when supplier changes
-  useEffect(() => {
-    if (selectedCompany) {
-      const supplier = suppliers.find(s => s.supplierName === selectedCompany);
-      if (supplier) {
-        setCrateDetails(prev => ({
-          ...prev,
-          opening: supplier.crateBalance || 0,
-          balance: supplier.crateBalance || 0
-        }));
-      }
-    } else {
-      setCrateDetails({
-        opening: 0,
-        supply: 0,
-        returned: 0,
-        balance: 0
-      });
-    }
-  }, [selectedCompany]);
-  
-  // Update crate balance when supply or return changes
-  useEffect(() => {
-    const newBalance = crateDetails.opening + crateDetails.supply - crateDetails.returned;
-    setCrateDetails(prev => ({
-      ...prev,
-      balance: newBalance
-    }));
-  }, [crateDetails.opening, crateDetails.supply, crateDetails.returned]);
+  // Available products for the selected supplier
+  const availableProducts = supplierName ? getProductsByCompany(supplierName) : [];
   
   const handleAddRow = () => {
-    setPurchaseItems([
-      ...purchaseItems,
+    setItems([
+      ...items,
       {
         productId: 0,
         productName: '',
@@ -116,13 +84,15 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
   };
   
   const handleRemoveRow = (index: number) => {
-    const updatedItems = [...purchaseItems];
-    updatedItems.splice(index, 1);
-    setPurchaseItems(updatedItems);
+    if (items.length > 1) {
+      const updatedItems = [...items];
+      updatedItems.splice(index, 1);
+      setItems(updatedItems);
+    }
   };
   
   const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
-    const updatedItems = [...purchaseItems];
+    const updatedItems = [...items];
     
     if (field === 'productId' && typeof value === 'number') {
       const product = availableProducts.find(p => p.productId === value);
@@ -142,12 +112,12 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
       };
     }
     
-    setPurchaseItems(updatedItems);
+    setItems(updatedItems);
   };
   
-  const handleCreatePurchase = () => {
+  const handleSave = () => {
     // Validation
-    if (!selectedCompany) {
+    if (!supplierName) {
       toast({
         title: "Validation Error",
         description: "Please select a supplier",
@@ -157,7 +127,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
     }
     
     // Filter out empty rows
-    const validItems = purchaseItems.filter(
+    const validItems = items.filter(
       item => item.productId > 0 && item.productName && item.quantity > 0 && item.purchasePrice > 0
     );
     
@@ -170,54 +140,50 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
       return;
     }
     
-    // Calculate total
+    // Calculate total amount
     const totalAmount = validItems.reduce(
       (sum, item) => sum + (item.quantity * item.purchasePrice), 
       0
     );
     
     // Create purchase object
-    const newPurchase = {
-      purchaseId,
-      supplierName: selectedCompany,
+    const purchaseObj = {
+      purchaseId: purchaseId,
+      supplierName,
       purchaseDate: format(purchaseDate, 'yyyy-MM-dd'),
       products: validItems,
-      totalAmount,
-      crateDetails
+      totalAmount
     };
     
-    // Update inventory (in a real app, this would be an API call)
-    // But for this mock, we'll just add a toast message
-    toast({
-      title: "Inventory Updated",
-      description: `Added ${validItems.reduce((sum, item) => sum + item.quantity, 0)} items to inventory`
-    });
-    
     // Add the purchase
-    onAddPurchase(newPurchase);
+    onAddPurchase(purchaseObj);
     
-    // Reset form with new purchase ID
-    setPurchaseId(getNextPurchaseId() + 1);
-    setSelectedCompany('');
-    setPurchaseDate(new Date());
-    setPurchaseItems(Array(5).fill(null).map(() => ({
-      productId: 0,
-      productName: '',
-      quantity: 0,
-      purchasePrice: 0
-    })));
-    setCrateDetails({
-      opening: 0,
-      supply: 0,
-      returned: 0,
-      balance: 0
-    });
+    // In a real app, you would update inventory via API
+    // For this mock, we'll just show a message
+    updateInventoryFromPurchase(purchaseObj);
     
     // Success message
     toast({
-      title: "Purchase Created",
-      description: `Purchase #${purchaseId} has been created successfully`
+      title: "Purchase Added",
+      description: `Purchase #${purchaseId} has been added successfully`
     });
+    
+    // Reset form for next purchase
+    setPurchaseId(getNextPurchaseId());
+    setPurchaseDate(new Date());
+    setSupplierName("");
+    setItems([
+      {
+        productId: 0,
+        productName: '',
+        quantity: 0,
+        purchasePrice: 0
+      }
+    ]);
+  };
+  
+  const calculateTotal = () => {
+    return items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.purchasePrice || 0)), 0);
   };
   
   return (
@@ -246,7 +212,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                   mode="single"
                   selected={purchaseDate}
                   onSelect={(date) => date && setPurchaseDate(date)}
-                  className="p-3 pointer-events-auto"
+                  initialFocus
                 />
               </PopoverContent>
             </Popover>
@@ -254,7 +220,10 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Supplier Name</label>
-            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+            <Select
+              value={supplierName}
+              onValueChange={setSupplierName}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
@@ -267,55 +236,13 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
           </div>
         </div>
         
-        {/* Crate details */}
-        {selectedCompany && (
-          <div className="border rounded-md p-4 bg-muted/30">
-            <h3 className="font-medium mb-2">Crate Details</h3>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="text-sm">Opening</label>
-                <Input 
-                  type="number" 
-                  value={crateDetails.opening} 
-                  disabled 
-                />
-              </div>
-              <div>
-                <label className="text-sm">Supply</label>
-                <Input 
-                  type="number" 
-                  value={crateDetails.supply} 
-                  onChange={(e) => setCrateDetails({...crateDetails, supply: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <label className="text-sm">Return</label>
-                <Input 
-                  type="number" 
-                  value={crateDetails.returned} 
-                  onChange={(e) => setCrateDetails({...crateDetails, returned: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <label className="text-sm">Balance</label>
-                <Input 
-                  type="number" 
-                  value={crateDetails.balance} 
-                  disabled 
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Product items */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium">Products</h3>
             <Button 
               size="sm" 
               onClick={handleAddRow}
-              disabled={!selectedCompany || availableProducts.length === 0}
+              disabled={!supplierName}
             >
               <PlusCircle className="h-4 w-4 mr-1" /> Add Row
             </Button>
@@ -332,7 +259,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {purchaseItems.map((item, index) => (
+              {items.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell>
                     <Select 
@@ -342,7 +269,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                           handleItemChange(index, 'productId', parseInt(value));
                         }
                       }}
-                      disabled={!selectedCompany || availableProducts.length === 0}
+                      disabled={!supplierName}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select product" />
@@ -388,6 +315,7 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
                       variant="ghost" 
                       size="sm"
                       onClick={() => handleRemoveRow(index)}
+                      disabled={items.length <= 1}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -401,20 +329,15 @@ const AddNewPurchase = ({ onAddPurchase }: AddNewPurchaseProps) => {
             <div></div>
             <div className="bg-muted px-4 py-2 rounded-md">
               <span className="font-medium">Total: </span>
-              <span>₹
-                {purchaseItems.reduce(
-                  (sum, item) => sum + (item.quantity || 0) * (item.purchasePrice || 0), 
-                  0
-                ).toLocaleString()}
-              </span>
+              <span>₹{calculateTotal().toLocaleString()}</span>
             </div>
           </div>
         </div>
         
         <div className="flex justify-end">
-          <Button onClick={handleCreatePurchase}>
+          <Button onClick={handleSave}>
             <Save className="h-4 w-4 mr-2" />
-            Create Purchase
+            Save Purchase
           </Button>
         </div>
       </div>
